@@ -9,6 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+1) what parameters should we use for the command arguments
+
 Hi Erin and Stephens!
  
 It's great to connect with you in this way, and thanks in advance for you help.

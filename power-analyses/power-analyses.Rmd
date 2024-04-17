@@ -1,0 +1,37 @@
+---
+title: "Power Analyses"
+author: "Erin Buchanan"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+
+```{r}
+library(tidyverse)
+library(lme4)
+```
+
+
+## Command Arguments
+
+Simulation variable setting if you were using the command line (does not run): 
+
+```{r eval = F}
+cmd_args = commandArgs(TRUE)
+N = as.numeric(cmd_args[1])
+N_c = as.numeric(cmd_args[2])
+N_rep = as.numeric(cmd_args[3])
+sim_label = cmd_args[4]
+```
+
+```{r}
+# figure out what the parameters are here 
+```
