@@ -1,0 +1,138 @@
+---
+title: "Planned Analysis Code"
+author: "Erin Buchanan"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Hi Erin and Stephens!
+ 
+It's great to connect with you in this way, and thanks in advance for you help.
+ 
+You should have already the link to the OSF (https://osf.io/srj49/) which contains the script for the power analyses. All other information like hypotheses etc. is in the manuscript (https://docs.google.com/document/d/1rbhVhVPe2RR-vLZ2w1TacpAc0AY47ni0/edit).  Please keep in mind that the power analyses will need to be slightly modified and re-run, since we will be now splitting countries in 2 groups instead of 3; I will also need to update the effect sizes as mentioned in the meeting. 
+In any case, it would be good to have another pair of eyes checking the code and the logic behind it, so please do have a look at it and let me know if you have suggestions; I summarize below key aspects of the simulations, highlighting some of the choices I have made, and it would be great to hear from you if these makes sense to you.
+ 
+The task involves cognitive reflection tests (CRT), presented twice to participants, in two distinct phases, so that they have the opportunity to correct their intuitive errors in the second, more 'deliberative' phase. As such, the main dependent variable is the fraction of errors corrected, and therefore the analysis is essentially a multilevel logistic regression. Note that the dependent variable is slightly different for hypotheses H1 vs. H2 and H3, corresponding to two slightly different conditional probabilities:
+for H1, it is the fraction of correct responses made in phase 2 out of all correct responses;
+for H2 and H3 is the fraction of errors, made in phase 1, that were corrected in phase 2.
+I hope these make sense! 
+ 
+One complexity in simulating data for this study is that the number of observations effectively depends on the number of errors that participants make (e.g., if a participant answered correctly all problems in phase 1, it would not contribute anything to the tests of hypotheses H2 and H3). To take this into account in the simulation I have estimated probability of making an error in phase 1, and of correcting in phase 2, based on previous studies by Miro (e.g. this one:  https://doi.org/10.1037/xge0001375) I have also estimated how these probabilities vary across participants, and obtained some plausible values for mean and SD, which are listed at the top of the script, under "parameter settings"; note that these are expressed in log-odds units. These values correspond to a pretty broad range of error rates, and relatively low rates of correcting the errors, matching prior results; in the manuscript I wrote : "in our simulation, we assumed that for the first stage, 95% of participants would have an error rate between 0.3 and 1. In the second stage, we assumed that 95% of participants would have a fraction of corrected errors ranging from 0 to 0.33."  (you can get these values by simulating individual participants' and their errors). If you look at the script you can see that the code to simulate the data is wrapped in the gen_data()​ function. 
+ 
+Lower down in the script there is also a function called test_hypotheses()​which does the actual model fitting and testing of hypotheses - this should be more straightforward but let me know if you have questions. 
+ 
+Some thoughts & questions:
+
+do the approach for taking heterogeneity in error rates sounds sensible to you? 
+at the moment the models have only random intercept by country. They don't include random slopes just because it slowed down simulations quite a lot, and initially I did not have access to a computing cluster. At the moment I just mentioned in the manuscript that will test a model with random slopes by-country as robustness check but am planning to switch to this for the main confirmatory analysis - let me know if you this sounds good with you.
+I did not include by-participants random intercepts; I found that this quite systematically produces numerical issues and convergence warnings, at least when running the model using lme4 package in R (there are only 6 CRT problems, so we only have at most 6 "bernoulli" observations per participants, and for many participants will be only 1 or 2, so it's hard to estimate by-participants random effects reliably). Please do let me know if this sounds OK to you. Probably the best way to take this into account would be to use a Bayesian multilevel model, estimated with MCMC sampling, but would make the power analyses a lot slower, so I have been avoiding this so far. 
+ 
+It would be great to have your feedback on the design table, as I have never really made one of these before. You can find this in the manuscript, but just in case I paste it below as well.
+ 
+ 
+ 
+I think that's all that comes to mind for the moment!
+ 
+All the best,
+Matteo
+ 
+ 
+ 
+Question
+
+Hypothesis
+
+Sampling plan (e.g. power analysis)
+
+Analysis Plan
+
+Interpretation given to different outcomes
+
+Question 1A
+
+Do people tend to correct their intuitive errors during deliberation?
+
+Hypothesis 1A
+
+We hypothesise that we people will provide only a relatively small proportion (i.e., below 50%) of correct responses during deliberation.
+
+Aiming for at least 95% power, we plan to recruit over 12,600 participants across cultural clusters, accounting for a 5% attrition rate. This is based on simulations informed by previous literature, assuming small effect sizes (Cohen's d ≥ 0.2) for our manipulations.
+
+We will use a logistic multilevel model to test if the baseline condition sees less than 50% of intuitive errors corrected in phase 2, using a one-tailed Wald test on the intercept (which corresponds to expected proportion of corrected responses in log-odds)
+
+Intercept < 0: Hypothesis supported; low correction rate.
+
+Intercept ≥ 0: Hypothesis not supported; higher correction rate.
+
+Question 1B
+
+Do people across different cultures tend to correct their intuitive errors during deliberation?
+
+Hypothesis 1B
+
+We expect that people will provide only a relatively small proportion of correct responses (i.e., below 50%) during deliberation in all diverse cultural contexts included in our study.
+
+Repeat the logistic multilevel model analysis for each cluster independently to assess the correction of intuitive errors. 
+
+Intercept < 0 in all clusters: Hypothesis supported; low correction rate universally across cultures.
+
+Intercept ≥ 0 in one or more clusters: Hypothesis not supported; suggests cultural variation in the propensity for error correction.
+
+Question 2A
+
+How does feedback on initial answers, as opposed to no feedback, affect an individual’s tendency to correct intuitive errors during deliberation?
+
+Hypothesis 2A 
+
+We hypothesise that providing answer feedback will increase the correction rate relative to having no feedback
+
+We will use a logistic multilevel model to compare the proportion of intuitive errors corrected in phase 2 between feedback and baseline conditions (one-tailed Wald test)
+
+Positive feedback effect: Supports the hypothesis; feedback increases error correction.
+
+No significant feedback effect: Hypothesis not supported; feedback does not increase error correction.
+
+Question 2B
+Do people across different cultures tend to correct their intuitive errors more if they receive answer feedback?
+
+Hypothesis 2B 
+
+We expect that the feedback effect will occur in all cultural contexts included in our study
+
+Repeat the logistic multilevel model analysis as in 2A, separately for each cluster, to evaluate the impact of feedback on error correction.
+
+Positive feedback effect in all clusters: Hypothesis supported; feedback universally increases error correction.
+
+Feedback effect non significant in one or more clusters: Hypothesis not supported; feedback does not universally increase error correction.
+
+Question 3A
+How does requestingthe answer justification of answers, as opposed to no justification, affect an individual’s tendency to correct intuitive errors during deliberation?
+
+Hypothesis 3A 
+
+We hypothesise that a request for justification of the answer will increase the error correction rate relative to a no justification condition.
+
+We will use a logistic multilevel model to compare the proportion of intuitive errors corrected in phase 2 between the answer-justification and baseline conditions (one-tailed Wald test)
+
+Positive answer-justification effect: Supports the hypothesis; requesting justification of answers increases error correction.
+
+No significant answer-justification effect: Hypothesis not supported; requesting justification of answers does not increase error correction.
+
+Question 3B
+
+Do people across different cultures tend to correct their intuitive errors more if they are asked to justify their answers?
+
+Hypothesis 3B
+
+We expect that the justification effect will occur in all cultural contexts included in our study.
+
+Repeat the logistic multilevel model analysis as in 3A, separately for each cluster, to evaluate the impact of request for justification on error correction.
+
+Positive answer-justification effect in all clusters: Hypothesis supported; requesting justification of answers universally increases error correction.
+
+Answer-justification effect non significant in one or more clusters: Hypothesis not supported; requesting justification of answers does not universally increase error correction.
+
