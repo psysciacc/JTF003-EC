@@ -34,4 +34,81 @@ sim_label = cmd_args[4]
 
 ```{r}
 # figure out what the parameters are here 
+N <- seq(from = 50, to = 250, by = 10)
+N_c <- seq(from = 30, to = 50, by = 2)
+N_rep <- 5 # change later 
+# define sim_label in the simulation code based on N and N_c
+```
+
+## Parameter Settings
+
+clarify where these numbers came from exactly 
+
+```{r}
+# parameter settings ----
+
+# these are plausible parameter values based on Sirota 2023 and similar 
+# article in the literature
+
+# p(error @ stage 1)
+err_mu <- 1.22
+err_sd <- 0.92
+
+# p(correct @ stage 2 | error @ stage 1) 
+corr_mu <- -2.53  
+corr_sd <- 1.12
+
+# set effect sizes ----
+
+# determine the country-level random effect variance
+rfx_sd_country  <- 0.2 
+
+# Set effect values in standardized as Cohen's d and rescale 
+# to an approximately similar value for the logistic distribution; 
+# specifically we multiply the d values by the ratio of the standard deviation
+# of the logistic distribution to that of the standard normal distribution, 
+# which is (pi/sqrt(3)).
+# 2 by 2 design and d_nothing <- 0 assumption, so it's set to the overall average as the intercept  
+d_fdbk <- 0.19 * (pi/sqrt(3)) # feedback minus baseline
+d_just <- 0.19 * (pi/sqrt(3)) # justification minus baseline
+d_both <- (d_fdbk + d_just)  # (feedback + justification) minus baseline 
+# Note: we expects the effects of feedback to be additive
+
+# vector of fixed-effects coefficients
+beta_lo_p <- c(corr_mu, NA, NA, NA)
+beta_lo_p[2] <- d_fdbk
+beta_lo_p[3] <- d_just
+beta_lo_p[4] <- d_both
+
+# power simulation parameters ----
+# based on the study design 
+n_trial <- 6
+```
+
+## Generate Labels
+
+what is the expected proportion of weird and not weird 
+
+```{r}
+# first custom function to sample countries from clusters with some constraints
+# with how little and how many countries there will be for each cluster
+# (based on the results of data collection in Bago et al 2022, https://doi.org/10.1038/s41562-022-01319-5)
+generate_labels <- function(N_c) {
+  
+  # min/max occurrences for each cluster
+  min_occurrences <- round(0.15 * N_c) # 15% are a specific type
+  max_occurrences <- round(0.65 * N_c) # 65% are a specific type 
+  
+  # sample with constraints
+  N_weird <- sample(min_occurrences:max_occurrences, 1)
+  N_nonweird <- sample(min_occurrences:max_occurrences, 1)
+  while((N_weird + N_nonweird) != N_c) {
+    N_weird <- sample(min_occurrences:max_occurrences, 1)
+    N_nonweird <- sample(min_occurrences:max_occurrences, 1)
+  }
+  labels <- c(rep("Weird", N_weird), rep("Non-Weird", N_nonweird))
+  labels <- sample(labels)
+  
+  return(labels)
+}
 ```
