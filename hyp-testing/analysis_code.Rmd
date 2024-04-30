@@ -27,7 +27,7 @@ One complexity in simulating data for this study is that the number of observati
  
 Lower down in the script there is also a function called test_hypotheses()​which does the actual model fitting and testing of hypotheses - this should be more straightforward but let me know if you have questions. 
  
-Some thoughts & questions:
+Some thoughts & questions: 
 
 do the approach for taking heterogeneity in error rates sounds sensible to you? 
 at the moment the models have only random intercept by country. They don't include random slopes just because it slowed down simulations quite a lot, and initially I did not have access to a computing cluster. At the moment I just mentioned in the manuscript that will test a model with random slopes by-country as robustness check but am planning to switch to this for the main confirmatory analysis - let me know if you this sounds good with you.
