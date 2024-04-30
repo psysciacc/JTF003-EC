@@ -22,7 +22,12 @@ library(lme4)
 
 ## Command Arguments
 
-Simulation variable setting if you were using the command line (does not run): 
+Simulation variable setting if you were using the command line (does not run)
+
+N = # of participants sampled, anywhere from 50-250 per simulation
+N_c = # of countries sampled, anywhere from 30-50 per simulation
+N_rep = # of repetitions for the sample simulations, currently 5
+sim_label = used to differentiate various simulations
 
 ```{r eval = F}
 cmd_args = commandArgs(TRUE)
@@ -42,7 +47,12 @@ N_rep <- 5 # change later
 
 ## Parameter Settings
 
-clarify where these numbers came from exactly 
+err_mu, err_sd, corr_mu, and corr_sd are rescalings of similar,
+previous simulations run as linear regressions. This was done 
+to account for what is common in the literature rather than one previous study.
+As such, these values are estimates of logistic distributions.
+
+
 
 ```{r}
 # parameter settings ----
