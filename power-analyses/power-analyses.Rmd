@@ -24,10 +24,10 @@ library(lme4)
 
 Simulation variable setting if you were using the command line (does not run)
 
-N = # of participants sampled, anywhere from 50-250 per simulation
-N_c = # of countries sampled, anywhere from 30-50 per simulation
-N_rep = # of repetitions for the sample simulations, currently 5
-sim_label = used to differentiate various simulations
+`N` = # of participants sampled, anywhere from 50-250 per simulation
+`N_c` = # of countries sampled, anywhere from 30-50 per simulation
+`N_rep` = # of repetitions for the sample simulations, currently 5
+`sim_label` = used to differentiate various simulations
 
 ```{r eval = F}
 cmd_args = commandArgs(TRUE)
@@ -42,45 +42,52 @@ sim_label = cmd_args[4]
 N <- seq(from = 50, to = 250, by = 10)
 N_c <- seq(from = 30, to = 50, by = 2)
 N_rep <- 5 # change later 
+weird_ratio <- c(.7, .6, .5)
 # define sim_label in the simulation code based on N and N_c
 ```
 
 ## Parameter Settings
 
-err_mu, err_sd, corr_mu, and corr_sd are rescalings of similar,
+`err_mu`, `err_sd`, `corr_mu`, and `corr_sd` are rescalings of similar,
 previous simulations run as linear regressions. This was done 
 to account for what is common in the literature rather than one previous study.
 As such, these values are estimates of logistic distributions.
 
-err_mu is the expected baseline mean number of errors made in the initial stage
+`err_mu` is the expected baseline mean number of errors made in the initial stage
 
-corr_mu is the expected mean number of correct responses made given error
+`corr_mu` is the expected mean number of correct responses made given error
 was made in the initial stage
 
-beta_lo_p is the average amount by which the amount of corrections made 
+`beta_lo_p` is the average amount by which the amount of corrections made 
 increases when [feedback, justification, or both] increases 
 by one standard deviation
 
-n_trial is set to 6 to capture a range of potential values for beta_lo_p
+`n_trial` is set to 6 to capture a range of potential values for `beta_lo_p`
 
 ```{r}
 # parameter settings ----
 
 # these are plausible parameter values based on Sirota 2023 and similar 
-# article in the literature
+# articles in the literature
+# note that they do not match any one set of results from a single paper
+# but represent average/plausible values 
 
 # p(error @ stage 1)
+# these are in log form 
 err_mu <- 1.22
 err_sd <- 0.92
 
 # p(correct @ stage 2 | error @ stage 1) 
+# these are in log form 
 corr_mu <- -2.53  
 corr_sd <- 1.12
 
 # set effect sizes ----
 
-# determine the country-level random effect variance
-rfx_sd_country  <- 0.2 
+# determine the country-level random effect SD
+# half the group-level effect size, so that ~95% of countries have 
+# population-level effects of the same sign
+rfx_sd_country  <- (0.19 * (pi/sqrt(3))) / 2 
 
 # Set effect values in standardized as Cohen's d and rescale 
 # to an approximately similar value for the logistic distribution; 
@@ -104,34 +111,120 @@ beta_lo_p[4] <- d_both
 n_trial <- 6
 ```
 
-## Generate Labels
+## Generate Labels Function
 
-what is the expected proportion of weird and not weird
-
-min_ and max_occurrences are set between 15-65% to capture a varying range
-of both WEIRD and non-WEIRD countries somewhat representative of real-world
-distributions
+Create a function to generate labels for our simulated countries....
 
 ```{r}
-# first custom function to sample countries from clusters with some constraints
-# with how little and how many countries there will be for each cluster
-# (based on the results of data collection in Bago et al 2022, https://doi.org/10.1038/s41562-022-01319-5)
-generate_labels <- function(N_c) {
-  
-  # min/max occurrences for each cluster
-  min_occurrences <- round(0.15 * N_c) # 15% are a specific type
-  max_occurrences <- round(0.65 * N_c) # 65% are a specific type 
-  
-  # sample with constraints
-  N_weird <- sample(min_occurrences:max_occurrences, 1)
-  N_nonweird <- sample(min_occurrences:max_occurrences, 1)
-  while((N_weird + N_nonweird) != N_c) {
-    N_weird <- sample(min_occurrences:max_occurrences, 1)
-    N_nonweird <- sample(min_occurrences:max_occurrences, 1)
-  }
-  labels <- c(rep("Weird", N_weird), rep("Non-Weird", N_nonweird))
-  labels <- sample(labels)
-  
+# country grouping labels
+generate_labels <- function(N_c, weird_ratio = 0.5) {
+  n_weird <- round(weird_ratio * N_c)
+  n_nonweird <- N_c - n_weird
+  labels <- c(
+      rep("weird", n_weird),
+      rep("non-weird", n_nonweird)
+    )[sample(N_c)]
   return(labels)
+}
+```
+
+## Generate Data Function
+
+$\hat{Y} ~ b_0 + b_1X + \epsilon_p + \epsilon_c$ - data generating information
+
+`b_0`: average score across participants (so this is `beta_lo_p[1]`)
+
+`b_1`: difference score between control and other condition (feedback, justification, both)
+
+  - but to make up the data, you simply make the control group X = 0, so no effect of slope, and then add the effects of conditions to the control group score 
+  
+`\epsilon_p`: random effect of participant: can't everyone's score perfectly right, so each person has a small residual between our guess `\hat{Y}` and their actual Y
+
+  - need to add this noise so that not every person in every country has the same scores 
+
+`\epsilon_c`: random effect of country group: the amount of residual that's due to country level influences 
+
+```{r}
+# data simulation function
+gen_data <- function(N, N_c, weird_ratio){
+  
+  # so N equal N per condition rather than N per country 
+  N_tot <- N * N_c * 4 # 4 is the number of between subjects conditions
+  
+  ## simulate dataset
+  
+  # simulate number of errors in phase 1
+  # number of errors can be negative? 
+  error_lo <- rnorm(N_tot, mean=err_mu, sd=err_sd)
+  
+  # simulate random effects and between-individual variability 
+  # (to introduce heterogeneity and make simulations more realistic)
+  # so we can get a set of scores from 0 to 6 since corr_sd = approximately 3 errors
+  rfx_id <- rnorm(N_tot, mean=0, sd=corr_sd)
+  
+  # sample countries
+  rfx_country <- rnorm(N_c, mean=0, sd=rfx_sd_country)
+  group_country <- generate_labels(N_c, weird_ratio)   
+  
+  # create dataset frame
+  dat <- expand_grid(country = 1:N_c,
+                     condition = 1:4,
+                     id = 1:N,
+                     trial=1:6) %>%
+    mutate(id = str_c(id,country,condition,sep="_"))
+  dat$country_group <- group_country[dat$country]
+  
+  # simulate responses
+  dat$corrected <- NA
+  dat$error <- NA
+  dat$id <- as.integer(factor(dat$id, labels=1:length(unique(dat$id))))
+  dat$lo <- NA
+  dat$error_lo <- error_lo[dat$id]
+  dat$rfx_country <- rfx_country[dat$country]
+  dat$rfx_id <- rfx_id[dat$id]
+  
+  # set log-odds of p(correction) for each datapoint
+  dat <- dat %>%
+    mutate(lo = beta_lo_p[1]+rfx_country+rfx_id) %>%
+    mutate(lo = case_when(
+      condition==1 ~ lo,
+      condition==2 ~ lo + beta_lo_p[2],
+      condition==3 ~ lo + beta_lo_p[3],
+      condition==4 ~ lo + beta_lo_p[4]
+    ))
+  
+  # simulate number of errors
+  dat$error <- rbinom(nrow(dat), size=1, p=exp(dat$error_lo)/(1+exp(dat$error_lo)))
+  
+  # simulate number of errors that are corrected in phase 2
+  dat$corrected <- ifelse(dat$error==1,
+                          rbinom(nrow(dat), size=1, p=exp(dat$lo)/(1+exp(dat$lo))),
+                          0)
+  
+  # total correct responses
+  dat$correct <- 1-dat$error + dat$corrected
+  
+  # keep only trials with errors in phase 1
+  dat <- dat %>%
+    # filter(error==1) %>%
+    mutate(c_F = ifelse(condition==2,1,0),
+           c_FR = ifelse(condition==3,1,0)) %>%
+    mutate(feedback=ifelse(condition==2 | condition==4, 1, 0),
+           justification=ifelse(condition==3 | condition==4, 1, 0),
+           condition = case_when(
+             condition==1 ~ "baseline",
+             condition==2 ~ "feedback",
+             condition==3 ~ "justification",
+             condition==4 ~ "feedback+justification"
+           ))
+  
+  dat$country_group <- factor(dat$country_group)
+  
+  # Set attributes
+  attr(dat, "N") <- N
+  attr(dat, "N_c") <- N_c
+  
+  # return simulated data
+  return(dat)
 }
 ```
