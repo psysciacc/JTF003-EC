@@ -1,0 +1,768 @@
+---
+title: "Analysis manipulation check (response justification)"
+author: "Matteo Lisi"
+date: "2024-05-20"
+output:
+  html_document:
+    toc: true
+    theme: united
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(kableExtra)
+```
+
+# Load & prepare data
+
+
+## R session
+
+Libraries used for this report:
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(qualtRics)
+library(sjPlot)
+library(ordinal)
+library(lme4)
+library(patchwork)
+```
+
+## Dataset
+
+Load dataset; note that the data in `manip_test_noOverlap_anonim.csv` have been already anonimized (`PROLIFIC_PID` has been replaced with an anonymous code) and do not contain the participants that also did the reading pre-test.
+
+```{r, message=FALSE, warning=FALSE}
+d <- read_csv("./manip_test_noOverlap_anonim.csv")
+```
+
+The three conditions in this experiment are the following
+
+- **CG** control groupd
+- **BJ** baseline (standard wording for response justification)
+- **IJ** 'improved' wording for response justification
+
+## Completion rates
+
+To compute the completion rates I have excluded previews, and determined the group (condition) based on the first click of the practice trial.
+
+```{r}
+dropout_rates <- d %>%
+  filter(Status == 0) %>%
+  mutate(group = case_when(
+    !is.na(`practice_CG_task_rt_First Click`) ~ "CG",
+    !is.na(`practice_BJ_task_rt_First Click`) ~ "BJ",
+    !is.na(`practice_IJ_task_rt_First Click`) ~ "IJ",
+    .default = NA
+  )) %>%
+  group_by(PROLIFIC_PID, group) %>%
+  summarise(Completed = max(Finished == 1)) %>%
+  ungroup() %>%
+  group_by(group) %>%
+  summarise(
+    Total_Participants = n(),
+    Dropouts = sum(Completed == 0),
+    Dropout_Rate = Dropouts / Total_Participants
+  )
+
+print(dropout_rates)
+```
+
+## Exclusions
+
+First we compute a table with the breakdown of how many participants are excluded for each criteria.
+
+```{r}
+total_initial <- nrow(d)
+
+# Status == 0
+excluded_status <- total_initial - nrow(d %>% filter(Status == 0))
+remaining_after_status <- nrow(d %>% filter(Status == 0))
+
+
+# Finished == 1
+excluded_finished <- remaining_after_status - nrow(d %>% filter(Status == 0, 
+                                                                Finished == 1))
+#excluded_finished <- total_initial - nrow(d %>% filter(Finished == 1))
+remaining_after_finished <- nrow(d %>% filter(Status == 0, 
+                                              Finished == 1))
+
+# Q_RecaptchaScore > 0.5
+excluded_recaptcha <- remaining_after_finished - nrow(d %>% filter(Status == 0, 
+                                                                   Finished == 1, 
+                                                                   Progress >= 99, 
+                                                                   Q_RecaptchaScore >= 0.5))
+remaining_after_recaptcha <- nrow(d %>% filter(Status == 0, 
+                                               Finished == 1, 
+                                               Progress >= 99, 
+                                               Q_RecaptchaScore >= 0.5))
+
+# Total number of participants excluded (excluded because they fail at least 1 criterion)
+total_excluded <- total_initial - remaining_after_recaptcha
+
+# Create summary table
+summary_table <- data.frame(
+  Criterion = c( "Status == 0",
+                 "Finished == 1", 
+                 "Q_RecaptchaScore >= 0.5", 
+                 "Total"),
+  Excluded = c(excluded_status, 
+               excluded_finished, 
+               excluded_recaptcha, 
+               total_excluded),
+  Fraction = c(excluded_status/total_initial, 
+               excluded_finished/total_initial, 
+               excluded_recaptcha/total_initial, 
+               total_excluded/total_initial),
+  
+  Percentage = c(excluded_status/total_initial * 100, 
+               excluded_finished/total_initial * 100, 
+               excluded_recaptcha/total_initial * 100, 
+               total_excluded/total_initial * 100)
+)
+
+# Print the summary table as an HTML table
+kable(summary_table, format = "html", booktabs = TRUE, 
+      col.names = c("Exclusion Criterion", "Number Excluded", "Fraction Excluded", "Percentage Excluded"), 
+      caption="Each line indicate how many participants failed each criterion. Exclusion criteria are applied sequentially in order; the last line indicate how many participants failed at least one criterion in total.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+
+Remove participants who failed at least one of the above criteria.
+```{r}
+d <- d %>% 
+  filter(Consent == 1, 
+         Progress >= 99, 
+         Finished == 1, 
+         Status == 0, 
+         Q_RecaptchaScore >= 0.5)
+```
+
+Check if there are any duplicated response (the same Prolific ID with more than 1 response)
+
+```{r}
+n_pid <- tapply(d$PROLIFIC_PID, d$PROLIFIC_PID, length)
+length(n_pid[n_pid==2])
+```
+
+These IDs have completed the survey twice
+```{r}
+duplicate_id <- names(n_pid[n_pid==2])
+duplicate_id
+```
+
+<!-- I will remove them for this analysis -->
+<!-- ```{r} -->
+<!-- d <- d[!is.element(d$PROLIFIC_PID, duplicate_id),] -->
+<!-- ``` -->
+
+I will include only the first response (based on the response date and time) for each duplicate ID.
+
+```{r}
+# keep in only the first response for each duplicate
+duplicates <- d %>%
+  filter(PROLIFIC_PID %in% duplicate_id) %>%
+  arrange(PROLIFIC_PID, StartDate, EndDate) %>%
+  group_by(PROLIFIC_PID) %>%
+  dplyr::slice(1) %>% # slice operate on each group for grouped df
+  ungroup()
+
+# non-duplicate responses
+non_duplicates <- d %>%
+  filter(!PROLIFIC_PID %in% duplicate_id)
+
+# put them ack together
+d <- bind_rows(duplicates, non_duplicates)
+```
+
+
+<!-- ```{r, include=FALSE} -->
+<!-- write_csv(d, "manipcheckdata_afterExclusions.csv") -->
+<!-- ``` -->
+
+
+## Demographics information of participants
+
+```{r}
+demographic_summary <- d %>%
+  summarise(
+    `Avearge age (Std.)` = sprintf("%.2f (%.2f)", mean(Age, na.rm = TRUE), sd(Age, na.rm = TRUE)),
+    `Age Range` = paste(min(Age, na.rm = TRUE), "to", max(Age, na.rm = TRUE)),
+    `N. males` = sprintf("%i", sum(Sex == 0, na.rm = TRUE)),
+    `N. female` = sprintf("%i", sum(Sex == 1, na.rm = TRUE))
+  ) %>%
+  pivot_longer(everything(), names_to = "Demographic", values_to = "Value") 
+
+knitr::kable(demographic_summary, format = "html", booktabs = TRUE, caption = "Demographic Information of Participants", col.names = c("Demographic", "Value"))%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+
+## Put data in long format for analyses
+
+For simplicity, I do this separately for each condition (CG, BJ and IJ) and then put them together.
+
+```{r}
+# CG
+crt_CG <- d %>% select(PROLIFIC_PID, matches("^crt[0-9]+_CG"))
+crt_CG <- crt_CG %>%
+  pivot_longer(
+    cols = -PROLIFIC_PID,
+    names_to = c("crt", ".value"),
+    names_pattern = "(crt\\d+)_CG_(.*)") 
+crt_CG$group <- "CG"
+crt_CG$explain <- NA
+
+# BJ
+crt_BJ <- d %>% select(PROLIFIC_PID, matches("^crt[0-9]+_BJ"))
+crt_BJ <- crt_BJ %>%
+  pivot_longer(
+    cols = -PROLIFIC_PID,
+    names_to = c("crt", ".value"),
+    names_pattern = "(crt\\d+)_BJ_(.*)") 
+crt_BJ$group <- "BJ"
+
+# IJ
+crt_IJ <- d %>% select(PROLIFIC_PID, matches("^crt[0-9]+_IJ"))
+crt_IJ <- crt_IJ %>%
+  pivot_longer(
+    cols = -PROLIFIC_PID,
+    names_to = c("crt", ".value"),
+    names_pattern = "(crt\\d+)_IJ_(.*)") 
+crt_IJ$group <- "IJ"
+
+# put together
+other_info <- d %>% select(PROLIFIC_PID, !matches("^crt[0-9]")) %>%
+  select(PROLIFIC_PID, !starts_with("practice"))
+crt_all <- rbind(crt_CG, crt_BJ, crt_IJ)
+dat <- left_join(crt_all, other_info, by = "PROLIFIC_PID") %>%
+  filter(!is.na(task))
+
+# recode response accuracy as binary 0/1
+dat$accuracy <- ifelse(!is.na(dat$task), 
+                       ifelse(dat$task==1,1,0),
+                       dat$task)
+
+# contrast coding for condition label
+dat$group <- factor(dat$group)
+contrasts(dat$group) <- contr.treatment(levels(dat$group), base=2)
+
+# make a smaller dataset for analysis, with counts of 
+# correct and errors for each participant
+dag <- dat %>%
+  group_by(PROLIFIC_PID, group) %>%
+  summarise(correct = sum(accuracy, na.rm=T),
+            N = n(),
+            accuracy=mean(accuracy, na.rm=T)) %>%
+  mutate(errors = N-correct) %>%
+  filter(!is.nan(accuracy))
+  
+# sanity check 
+all(dag$N==6)
+dag[is.element(dag$PROLIFIC_PID,sample(dag$PROLIFIC_PID,5)),] # 5 random IDs
+```
+
+## Summary statistics
+
+```{r}
+stat_summary <- dat %>%
+  group_by(PROLIFIC_PID, group) %>%
+  summarise(accuracy = mean(accuracy, na.rm = TRUE),
+            RT = mean(`task_rt_Page Submit`, na.rm = TRUE)) %>%
+  group_by(group)%>%
+  summarise(
+    Accuracy = sprintf("%.2f (%.2f)", mean(accuracy, na.rm = TRUE), sd(accuracy, na.rm = TRUE)),
+    `Response time` = sprintf("%.2f (%.2f)", mean(RT, na.rm = TRUE), sd(RT, na.rm = TRUE))
+  )  
+
+knitr::kable(stat_summary, format = "html", booktabs = TRUE, caption = "Summary statistics (accuracy and response time); values reported as mean (Std.) across participants.") %>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+## Summary statistics by CRT problem
+
+```{r}
+stat_summary <- dat %>%
+  group_by(crt, group) %>%
+  summarise(
+    Accuracy = sprintf("%.2f (%.2f)", mean(accuracy, na.rm = TRUE), sd(accuracy, na.rm = TRUE)),
+    RT = sprintf("%.2f (%.2f)", mean(`task_rt_Page Submit`, na.rm = TRUE), sd(`task_rt_Page Submit`, na.rm = TRUE))
+  )  %>%
+  pivot_wider(
+    names_from = group, 
+    values_from = c(Accuracy, RT),
+    names_sep = " "
+  )
+
+knitr::kable(stat_summary, format = "html", booktabs = TRUE, caption = "Summary statistics of accuracy and response time for individual CRT problems")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+
+# Effect of response justification on accuracy
+
+Firstly, we recode the contrasts of condition (`group`) such that the control group is the baseline.
+
+- `CG` control group
+- `BJ` response justification
+- `IJ` response justification with improved wording
+
+```{r}
+dag$group <- factor(dag$group)
+contrasts(dag$group) <- contr.treatment(levels(dag$group), base=2)
+contrasts(dag$group)
+```
+
+Next, I compare difference in accuracy between groups using a logistic regression. I have used a random effects model, with random intercepts by participants and item (similar results would be obtained with a simple logistic regression).
+
+```{r}
+dag_acc <- dat %>%
+  group_by(PROLIFIC_PID, group, crt) %>%
+  summarise(accuracy=mean(accuracy, na.rm=T))
+
+m_logi <- glmer(accuracy ~ group  + (1|PROLIFIC_PID) + (1|crt), family=binomial("logit"), data=dag_acc, control=glmerControl(optimizer="bobyqa"))
+
+summary(m_logi)
+tab_model(m_logi, show.icc=FALSE, show.r2 = FALSE)
+```
+
+
+### Standardized effect sizes
+
+To the best of my knowledge, there is no universally accepted way to convert odds-ratio (as obtained from the logixtic regression) to Cohen's *d*. A common way to approximately map odds-ratios to *d* values is by scaling by the standard deviation of the logistic distribution $\pi \sqrt{3}$.
+
+This gives the following:
+
+```{r}
+(fixef(m_logi)[2:3] * sqrt(3)) / pi
+```
+
+A more straightforward approach could be simply to apply Cohen's classical formula the difference in mean accuracy and divide by the pooled standard deviations. This gives the following estimates, which numerically are very close to the previous ones.
+
+```{r}
+pooled_sd <- function(x, y) {
+  nx <- length(x)
+  ny <- length(y)
+  sqrt(((nx - 1) * var(x) + (ny - 1) * var(y)) / (nx + ny - 2))
+}
+
+BJ <- dag$accuracy[dag$group=="BJ"]
+IJ <- dag$accuracy[dag$group=="IJ"]
+CG <- dag$accuracy[dag$group=="CG"]
+
+# effect size for BJ vs CG
+(mean(BJ) - mean(CG)) / pooled_sd(BJ, CG)
+
+# effect size for IJ vs CG
+(mean(IJ) - mean(CG)) / pooled_sd(IJ, CG)
+```
+
+
+## Does the improved wording make a difference?
+
+TO directly test the difference between `BJ` and `IJ` conditions we can swap the dummy coding. Numerically accuracy is slightly higher in `IJ`, but the below analysis indicate that the difference is not statistically significant.
+
+```{r}
+contrasts(dag_acc$group) <- contr.treatment(levels(dag_acc$group), base=1)
+m_logi2 <- glmer(accuracy ~ group  + (1|PROLIFIC_PID) + (1|crt), family=binomial("logit"), data=dag_acc, control=glmerControl(optimizer="bobyqa"))
+tab_model(m_logi2, show.r2 = FALSE, show.icc=FALSE)
+```
+
+
+## Plot
+
+
+```{r, fig.align='center', fig.height=4, fig.width=6}
+# binomial standard error
+binomSEM <- function(v){
+  sqrt((mean(v) * (1 - mean(v)))/length(v))
+  }
+
+# compute average accuracy
+dag2 <- aggregate(accuracy ~ group, dag, mean)
+dag2$se <- aggregate(accuracy ~ group, dag, binomSEM)$accuracy
+
+pl1 <- dag %>%
+  ggplot(aes(x=accuracy)) +
+  geom_histogram(binwidth=1/6, fill="darkgrey",color="white")+
+  facet_grid(fct_relevel(group, "CG")~.)+
+  theme_minimal()+
+  labs(x="accuracy")
+
+pl2 <- dag2 %>%
+  ggplot(aes(x=fct_relevel(group, "CG"), y=accuracy)) +
+  theme_minimal()+
+  labs(x="", y="mean accuracy")+
+  geom_point(size=4) +
+  geom_errorbar(aes(ymin=accuracy-se, ymax=accuracy+se), width=0)+
+  geom_line(aes(group=1))
+
+pl1 + pl2
+```
+
+# Length of response justification
+
+Here I look at what people types in the response justification (both in terms of raw number of characters and number of words)
+
+```{r}
+dat %>%
+  filter(group!="CG") %>%
+  mutate(
+    word_count = str_count(explain, "\\S+"), # Count words
+    char_count = nchar(explain)  # Count characters
+  ) %>%
+  group_by(group) %>%
+  summarise(
+    `average word count (std.)` = sprintf("%.2f (%.2f)", mean(word_count, na.rm = TRUE), sd(word_count, na.rm = TRUE)),
+    `average char. count (std.)` = sprintf("%.2f (%.2f)", mean(char_count, na.rm = TRUE), sd(char_count, na.rm = TRUE))
+  ) %>%
+  knitr::kable(stat_summary, format = "html", booktabs = TRUE, caption = "Lenght of response justification")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+To compare these statistically, I use a simple t-test. The results indicates that people tended to write a bit more in the 'improved' `IJ` condition.
+
+```{r}
+dat_length <- dat %>%
+  filter(group!="CG") %>%
+  mutate(
+    word_count = str_count(explain, "\\S+"), # Count words
+    char_count = nchar(explain)) %>%  # Count characters
+  group_by(group, PROLIFIC_PID) %>%
+  summarise(
+    average_word_count = mean(word_count, na.rm=T),
+    average_char_count = mean(char_count, na.rm=T)
+  )
+  
+t.test(dat_length$average_char_count[dat_length$group=="BJ"],
+       dat_length$average_char_count[dat_length$group=="IJ"])
+
+t.test(dat_length$average_word_count[dat_length$group=="BJ"],
+       dat_length$average_word_count[dat_length$group=="IJ"])
+```
+
+
+# Time spent
+
+Here we compare the log-transformed response times
+
+```{r, fig.align='center', fig.height=4, fig.width=6}
+dag_RT <- dat %>%
+  group_by(PROLIFIC_PID, group) %>%
+  summarise(correct = sum(accuracy, na.rm=T),
+            N = n(),
+            accuracy=mean(accuracy, na.rm=T),
+            RT = mean(`task_rt_Page Submit`, na.rm=T)) %>%
+  mutate(errors = N-correct,
+         log_RT = log(RT)) %>%
+  filter(!is.nan(accuracy))
+
+# linear model on log-transformed response times
+m_rt <- lm(log_RT ~ group, dag_RT)
+summary(m_rt)
+tab_model(m_rt)
+
+# plot
+dag_RT %>%
+  ggplot(aes(x=RT)) +
+  geom_histogram(fill="darkgrey",color="white")+
+  facet_grid(fct_relevel(group, "CG")~.)+
+  theme_minimal()+
+  labs(x="response time")
+```
+
+Both `IJ` and `BJ` have longer response times than baseline, and numerically the response time is slightly longer in `IJ` than in in `BJ` (see also t-test below).
+
+```{r}
+t.test(log_RT ~ group, dag_RT[dag_RT$group!='CG',])
+```
+
+
+# Perceived effort
+
+There seems to be no difference in the perceived, self-reported effort among all conditions. I test this formally using an ordinal logistic model.
+
+```{r, fig.align='center', fig.height=4, fig.width=6}
+dag_effort <- dat %>%
+  group_by(PROLIFIC_PID) %>%
+  summarise(CG_mental_effort = mean(CG_mental_effort),
+            BJ_mental_effort = mean(BJ_mental_effort),
+            IJ_mental_effort = mean(IJ_mental_effort)) %>%
+  pivot_longer(cols = ends_with("_mental_effort"), 
+               names_to = "group", 
+               values_to = "mental_effort") %>%
+  mutate(group = gsub("_mental_effort", "", group),
+         group = fct_relevel(group, "CG"))%>%
+  filter(!is.na(mental_effort))
+
+# plot
+dag_effort %>%
+  ggplot(aes(x=mental_effort)) +
+  geom_histogram(binwidth=1, fill="darkgrey",color="white")+
+  facet_grid(fct_relevel(group, "CG")~.)+
+  theme_minimal()+
+  scale_x_continuous(breaks=seq(1:9))+
+  labs(x="response")
+
+# ordinal model
+dag_effort$response <- factor(dag_effort$mental_effort)
+m_eff <- clm(response ~ group, data = dag_effort)
+summary(m_eff)
+tab_model(m_eff, show.r2 = FALSE)
+
+```
+
+# Beliefs about reviewing justification
+
+The question here was: *How carefully do you believe the explanations of your answers to the reasoning problems will be reviewed by the research team?*
+
+Participants could choose one of the following options:
+
+1. Not at all reviewed
+2. Skimmed
+3. Casually reviewed
+4. Reviewed with a moderate level of attention
+5. Carefully reviewed
+6. Extremely carefully reviewed
+
+Here we see that most people report that they believe the justification will be reviewed, and this belief seems slightly stronger in the `IJ` condition
+
+```{r, fig.align='center', fig.height=4, fig.width=6}
+# check review
+dag_review <- dat %>%
+  group_by(PROLIFIC_PID) %>%
+  summarise(BJ_check_review = mean(BJ_check_review),
+            IJ_check_review = mean(IJ_check_review)) %>%
+  pivot_longer(cols = ends_with("_check_review"), 
+               names_to = "group", 
+               values_to = "check_review") %>%
+  mutate(group = gsub("_check_review", "", group))%>%
+  filter(!is.na(check_review))
+
+# plot
+dag_review %>%
+  ggplot(aes(x=check_review)) +
+  geom_histogram(binwidth=1, fill="darkgrey",color="white")+
+  facet_grid(group~.)+
+  theme_minimal()+
+  scale_x_continuous(breaks=seq(1:6))+
+  labs(x="response")
+
+# ordinal model
+dag_review$response <- factor(dag_review$check_review)
+m_review <- clm(response ~ group, data = dag_review)
+summary(m_review)
+tab_model(m_review, show.r2 = FALSE)
+```
+
+
+# Use of external resources
+
+Her we compute first a table indicating the count and fraction of participants reporting use of external resources for each CRT item.
+
+```{r}
+# ext_resources
+dag_resources <- dat %>%
+  select(starts_with("ext_resources"),PROLIFIC_PID, group) %>%
+  group_by(PROLIFIC_PID, group) %>%
+  summarise(ext_resources_use_1 = mean(ext_resources_use_1),
+            ext_resources_use_2 = mean(ext_resources_use_2),
+            ext_resources_use_3 = mean(ext_resources_use_3),
+            ext_resources_use_4 = mean(ext_resources_use_4),
+            ext_resources_use_5 = mean(ext_resources_use_5),
+            ext_resources_use_6 = mean(ext_resources_use_6)) %>%
+  pivot_longer(cols = starts_with("ext_resources"),
+               names_to = "CRT", 
+               values_to = "ext_resources",
+               values_drop_na = TRUE) %>%
+  filter(!is.na(ext_resources)) %>%
+  mutate(CRT = sub(".*_(\\d+)$", "\\1", CRT), # just polish name
+         used_external = ifelse(ext_resources==1,1,0)) 
+
+dag_accuracy <- dat %>%
+  mutate(CRT = sub("crt", "", crt)) %>%
+  group_by(PROLIFIC_PID, group, CRT) %>%
+  summarise(accuracy = mean(accuracy))
+
+dag_resources <- left_join(dag_resources, dag_accuracy, by=c("PROLIFIC_PID", "group", "CRT"))
+
+dag_resources %>%
+  group_by(CRT, group) %>%
+  summarise(
+    proportion = sprintf("%.3f", mean(used_external, na.rm = TRUE)),
+    count = sprintf("%i of %i", sum(used_external, na.rm = TRUE), length(used_external))
+  )  %>%
+  pivot_wider(
+    names_from = group, 
+    values_from = c(proportion, count),
+    names_sep = " "
+  ) %>%
+  knitr::kable(format = "html", booktabs = TRUE, caption = "Proportion and number of people reporting use of external resources for each CRT item.")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+
+# logistic regression
+dag_resources$response <- dag_resources$ext_resources -1
+m_res <- glmer(response ~ group + (1|PROLIFIC_PID) + (1|CRT), family=binomial("logit"),data = dag_resources)
+summary(m_res)
+tab_model(m_res, show.r2 = FALSE, show.icc = FALSE)
+```
+
+## Effects of reported use of external resources on accuracy.
+
+Here we compute the accuracy split by whether people reported to use external resources or not. I also run a logistic model that indicates a clear effect of use of external resources on accuracy, but there does not seem to be an interaction (i.e. it does not seem to be the case that people used external resources more carefully/attentively when a response justification was required).
+
+
+```{r}
+dag_resources %>%
+  group_by(CRT, group,used_external) %>%
+  summarise(
+    accuracy = sprintf("%.2f (%.2f)", mean(accuracy, na.rm = TRUE), 
+                       sd(accuracy, na.rm = TRUE))
+  )  %>%
+  pivot_wider(
+    names_from = group, 
+    values_from = accuracy,
+    names_sep = " "
+  ) %>%
+  knitr::kable(format = "html", booktabs = TRUE, caption = "Effects of reported use of external resources on accuracy, compute separately for each CRT item. Accuracy here is reported as mean (std.) across participants.")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+
+dag_resources %>%
+  group_by(PROLIFIC_PID, group,used_external) %>%
+  summarise(accuracy = mean(accuracy)) %>%
+  group_by(group,used_external) %>%
+  summarise(
+    accuracy = sprintf("%.2f (%.2f)", mean(accuracy, na.rm = TRUE), 
+                       sd(accuracy, na.rm = TRUE))
+  )  %>%
+  pivot_wider(
+    names_from = group, 
+    values_from = accuracy,
+    names_sep = " "
+  ) %>%
+  knitr::kable(format = "html", booktabs = TRUE, caption = "Effects of reported use of external resources on accuracy, compute separately for each CRT item. Accuracy here is reported as mean (std.) across participants.")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+
+
+m_accres <- glmer(accuracy ~ group * used_external + (1|PROLIFIC_PID) + (1|CRT), family=binomial("logit"),data = dag_resources)
+summary(m_accres)
+tab_model(m_accres, show.r2 = FALSE, show.icc = FALSE)
+```
+
+
+# Familiarity
+
+The question was: *Have you ever encountered any of the reasoning problems listed below before participating in our study?*
+
+Response options:
+
+1. yes, I did encounter the same problem before
+2. yes, I did encounter the same problem before
+3. no, I have not encountered it before
+
+```{r, fig.align='center', fig.height=4, fig.width=6, fig.cap="facets 1 to 6 indicate the different CRT problems"}
+dag_fam <- dat %>%
+  select(starts_with("familiarity"),PROLIFIC_PID, group) %>%
+  group_by(PROLIFIC_PID, group) %>%
+  summarise(familiarity_1 = mean(familiarity_1),
+            familiarity_2 = mean(familiarity_2),
+            familiarity_3 = mean(familiarity_3),
+            familiarity_4 = mean(familiarity_4),
+            familiarity_5 = mean(familiarity_5),
+            familiarity_6 = mean(familiarity_6)) %>%
+  pivot_longer(cols = starts_with("familiarity"),
+               names_to = "CRT", 
+               values_to = "familiarity",
+               values_drop_na = TRUE) %>%
+  filter(!is.na(familiarity)) %>%
+  mutate(CRT = sub(".*_(\\d+)$", "\\1", CRT))
+
+dag_accuracy <- dat %>%
+  mutate(CRT = sub("crt", "", crt)) %>%
+  group_by(PROLIFIC_PID, group, CRT) %>%
+  summarise(accuracy = mean(accuracy))
+
+dag_fam <- left_join(dag_fam, dag_accuracy, by=c("PROLIFIC_PID", "group", "CRT"))
+
+# plot
+dag_fam %>%
+  ggplot(aes(x=familiarity)) +
+  geom_histogram(binwidth=1, fill="darkgrey",color="white")+
+  facet_grid(group~CRT)+
+  theme_minimal()+
+  scale_x_continuous(breaks=seq(1:3))+
+  labs(x="response")
+
+# ordinal logistic model
+dag_fam$response <- factor(dag_fam$familiarity)
+dag_fam$CRT <- factor(dag_fam$CRT)
+m_fam <- clm(response ~ group + CRT, data = dag_fam)
+summary(m_fam)
+tab_model(m_fam, show.r2 = FALSE)
+```
+
+
+```{r}
+# count the occurrences of each rating
+familiarity_counts <- dag_fam %>%
+  group_by(familiarity) %>%
+  summarise(count = n()) %>%
+  ungroup()
+
+# total number of ratings
+total_ratings <- sum(familiarity_counts$count)
+
+# percentage for each familiarity rating
+familiarity_counts <- familiarity_counts %>%
+  mutate(percentage = sprintf("%.2f %s", (count / total_ratings) * 100, " %"))
+
+familiarity_counts %>%
+  knitr::kable(format = "html", booktabs = TRUE, caption = "Familiarity (counts summed across all CRT problems)")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+
+## Effects of familiarity on accuracy
+
+Here we examined how accuracy changed with reported familiarity. Data provide clear evidence that accuracy is higher with greater familiarity. 
+
+We tested also whether the effect of familiarity interacted with the effect of response justification, and there is some evidence for an interaction. Essentially, the effect of familiarity is larger than the effect of response justification, and the accuracy in CRT problems that are familiar to people is already high, such that it seems to attenuate the effect of asking for response justification. However, these results should be take with 
+
+```{r}
+dag_fam %>%
+  group_by(group,familiarity, CRT) %>%
+  summarise(
+    accuracy = sprintf("%.2f (%.2f)", mean(accuracy, na.rm = TRUE), 
+                       sd(accuracy, na.rm = TRUE))
+  )  %>%
+  pivot_wider(
+    names_from = group, 
+    values_from = accuracy,
+    names_sep = " "
+  ) %>%
+  knitr::kable(format = "html", booktabs = TRUE, caption = "Accuracy split by familiarity.")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+
+#
+dag_fam %>%
+  group_by(group,familiarity) %>%
+  summarise(
+    accuracy = sprintf("%.2f (%.2f)", mean(accuracy, na.rm = TRUE), 
+                       sd(accuracy, na.rm = TRUE))
+  )  %>%
+  pivot_wider(
+    names_from = group, 
+    values_from = accuracy,
+    names_sep = " "
+  ) %>%
+  knitr::kable(format = "html", booktabs = TRUE, caption = "Accuracy split by familiarity.")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+
+dag_fam$familiarity <- factor(dag_fam$familiarity)
+contrasts(dag_fam$familiarity) <- contr.treatment(levels(dag_fam$familiarity), base=3) # this ensure main effect of conditions is tested at familiarity = 3
+m_fam <- glmer(accuracy ~ group * familiarity + (1|PROLIFIC_PID) + (1|CRT), family=binomial("logit"),data = dag_fam, control=glmerControl(optimizer="bobyqa"))
+summary(m_fam)
+tab_model(m_fam, show.r2 = FALSE, show.icc = FALSE)
+```
