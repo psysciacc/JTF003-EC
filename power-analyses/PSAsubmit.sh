@@ -2,10 +2,11 @@
 # File: PSAsubmit.sh
 
 # Generate the sequences for $1 and $2 using seq command in bash
-N=$(seq 50 25 250)
-N_c=$(seq 30 10 50)
+N=$(seq 25 25 250)
+N_c=$(seq 30 2 50)
+wratio=0.5
 N_rep=50
-iteration="A B C D E F"
+iteration="A B C D E F G H"
 
 
 # Iterate over the values for $1, $2 and iteration
@@ -16,7 +17,7 @@ do
         for letter in $iteration
         do
             # Submit the job with current values
-            qsub PSAsim_wrapper.sh $val1 $val2 $N_rep $letter
+            qsub PSA_sim_wrapper.sh $val1 $val2 $N_rep $wratio $letter
         done
     done
 done

@@ -5,7 +5,8 @@ cmd_args=commandArgs(TRUE)
 N = as.numeric(cmd_args[1])
 N_c = as.numeric(cmd_args[2])
 N_rep = as.numeric(cmd_args[3])
-sim_label = cmd_args[4]
+weird_ratio = as.numeric(cmd_args[4])
+sim_label = cmd_args[5]
 
 
 # library
@@ -26,16 +27,13 @@ corr_sd <- 1.12
 
 # set effect sizes ----
 
-# determine the country-level random effect variance
-rfx_sd_country  <- 0.2 
-
 # Set effect values in standardized as Cohen's d and rescale 
 # to an approximately similar value for the logistic distribution; 
 # specifically we multiply the d values by the ratio of the standard deviation
 # of the logistic distribution to that of the standard normal distribution, 
 # which is (pi/sqrt(3)).
-d_fdbk <- 0.2 * (pi/sqrt(3)) # feedback minus baseline
-d_just <- 0.2 * (pi/sqrt(3)) # justification minus baseline
+d_fdbk <- 0.19 * (pi/sqrt(3)) # feedback minus baseline
+d_just <- 0.19 * (pi/sqrt(3)) # justification minus baseline
 d_both <- (d_fdbk + d_just)  # (feedback + justification) minus baseline 
 # Note: we expects the effects of feedback to be additive
 
@@ -45,42 +43,32 @@ beta_lo_p[2] <- d_fdbk
 beta_lo_p[3] <- d_just
 beta_lo_p[4] <- d_both
 
+# determine the country-level random effect SD
+# half the group-level effect size, so that ~95% of countries have 
+# population-level effects of the same sign
+rfx_sd_country  <- (0.19 * (pi/sqrt(3))) / 2 
+
 # power simulation parameters ----
 n_trial <- 6
 
 # wrapper function to simulate data ----
 
-# first custom function to sample countries from clusters with some constraints
-# with how little and how many countries there will be for each cluster
-# (based on the results of data collection in Bago et al 2022, https://doi.org/10.1038/s41562-022-01319-5)
-generate_labels <- function(N_c) {
-  
-  # min/max occurrences for each cluster
-  min_occurrences <- round(0.15 * N_c)
-  max_occurrences <- round(0.65 * N_c)
-  
-  # sample with constraints
-  N_southern <- sample(min_occurrences:max_occurrences, 1)
-  N_eastern <- sample(min_occurrences:max_occurrences, 1)
-  while((N_southern + N_eastern) > (N_c - min_occurrences) || (N_southern + N_eastern) < (N_c - max_occurrences)) {
-    N_southern <- sample(min_occurrences:max_occurrences, 1)
-    N_eastern <- sample(min_occurrences:max_occurrences, 1)
-  }
-  N_western <- N_c - (N_southern + N_eastern)
-  labels <- c(rep("Southern", N_southern), rep("Eastern", N_eastern), rep("Western", N_western))
-  labels <- sample(labels)
-  
+# country grouping labels
+generate_labels <- function(N_c, weird_ratio=0.5) {
+  n_weird <- round(weird_ratio * N_c)
+  n_nonweird <- N_c - n_weird
+  labels <- c(rep("weird", n_weird),rep("non-weird", n_nonweird))[sample(N_c)]
   return(labels)
 }
 
 # data simulation function
-gen_data <- function(N, N_c){
+gen_data <- function(N, N_c, weird_ratio){
   
   N_tot <- N * N_c * 4 # 4 is the number of between subjects conditions
   
   ## simulate dataset
   
-  # simulate number of errors in phase 1
+  # simulate error propensity of individual participants in phase 1
   error_lo <- rnorm(N_tot, mean=err_mu, sd=err_sd)
   
   # simulate random effects and between-individual variability 
@@ -89,14 +77,15 @@ gen_data <- function(N, N_c){
   
   # sample countries
   rfx_country <- rnorm(N_c, mean=0, sd=rfx_sd_country)
-  cluster_country <- generate_labels(N_c)   
+  group_country <- generate_labels(N_c, weird_ratio)   
+  
   # create dataset frame
   dat <- expand_grid(country = 1:N_c,
                      condition = 1:4,
                      id = 1:N,
                      trial=1:6) %>%
     mutate(id = str_c(id,country,condition,sep="_"))
-  dat$cluster <- cluster_country[dat$country]
+  dat$country_group <- group_country[dat$country]
   
   # simulate responses
   dat$corrected <- NA
@@ -142,8 +131,7 @@ gen_data <- function(N, N_c){
              condition==4 ~ "feedback+justification"
            ))
   
-  dat$cluster <- factor(dat$cluster)
-  contrasts(dat$cluster) <- contr.treatment(levels(dat$cluster), base=3)
+  dat$country_group <- factor(dat$country_group)
   
   # Set attributes
   attr(dat, "N") <- N
@@ -158,7 +146,7 @@ gen_data <- function(N, N_c){
 test_hypotheses <- function(dat){
   
   require(lme4)
-  # dat <- gen_data(100, 30)
+  # dat <- gen_data(100, 30, 0.6)
   
   dat_H1 <- dat %>%
     filter(correct==1)
@@ -169,52 +157,46 @@ test_hypotheses <- function(dat){
   ## FIT MODELS
   
   # fit overall model
-  m_all <- glmer(corrected ~ feedback * justification + (1|country),
+  m_all <- glmer(corrected ~ feedback * justification + (feedback * justification||country),
                  family=binomial("logit"), data=dat,
                  control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
   
-  # fit cluster-level models
-  m_west <- glmer(corrected ~  feedback * justification + (1|country),
-                  family=binomial("logit"), data=dat[dat$cluster=="Western",],
+  # fit country_group-level models
+  m_w <- glmer(corrected ~  feedback * justification + (feedback * justification||country),
+                  family=binomial("logit"), data=dat[dat$country_group=="weird",],
                   control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
   
-  m_south <- glmer(corrected ~  feedback * justification + (1|country),
-                   family=binomial("logit"), data=dat[dat$cluster=="Southern",],
+  m_nw <- glmer(corrected ~  feedback * justification + (feedback * justification||country),
+                   family=binomial("logit"), data=dat[dat$country_group=="non-weird",],
                    control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
   
-  m_east <- glmer(corrected ~  feedback * justification + (1|country),
-                  family=binomial("logit"), data=dat[dat$cluster=="Eastern",],
-                  control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
   
   # now fit models for H1 specifically: note that here the dependent variable is different
   # as the hypothesis is about the proportion of correct response (out of all correct responses)
   # that are corrected in phase 2 ('data' arguments is set to 'dat_H1' instead of just 'dat')
   # 
-  mH1_all <- glmer(corrected ~ feedback * justification + (1|country),
-                 family=binomial("logit"), data=dat_H1,
-                 control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
-
-  # fit cluster-level models
-  mH1_west <- glmer(corrected ~ feedback * justification + (1|country),
-                  family=binomial("logit"), data=dat_H1[dat_H1$cluster=="Western",],
-                  control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
-
-  mH1_south <- glmer(corrected ~ feedback * justification + (1|country),
-                   family=binomial("logit"), data=dat_H1[dat_H1$cluster=="Southern",],
+  mH1_all <- glmer(corrected ~ feedback * justification + (feedback * justification||country),
+                   family=binomial("logit"), data=dat_H1,
                    control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
-
-  mH1_east <- glmer(corrected ~ feedback * justification + (1|country),
-                  family=binomial("logit"), data=dat_H1[dat_H1$cluster=="Eastern",],
-                  control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
   
+  # fit country_group-level models
+  mH1_w <- glmer(corrected ~ feedback * justification + (feedback * justification||country),
+                    family=binomial("logit"), data=dat_H1[dat_H1$country_group=="weird",],
+                    control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
+  
+  mH1_nw <- glmer(corrected ~ feedback * justification + (feedback * justification||country),
+                     family=binomial("logit"), data=dat_H1[dat_H1$country_group=="non-weird",],
+                     control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
+  
+
   ## TEST HYPOTHESES
   
   alpha <- 0.05
-  # note: the tests on separate clusters are independent one another 
+  # note: the tests on separate country_groups are independent one another 
   # (different countries, participants, labs, etc.), so the expected false positive
-  # rate of the composite test, run on the 3 cluster separately and using the 
-  # conventional alpha=0.05 for each test, would be 0.05^3 = 0.000125 (the 
-  # hypothesis supported if and only if all 3 independent tests are significant)
+  # rate of the composite test, run on the 2 country_group separately and using the 
+  # conventional alpha=0.05 for each test, would be 0.05^2 = 0.0025 (the 
+  # hypothesis supported if and only if all 2 independent tests are significant)
   # We don't also apply correction for multiple comparisons otherwise it would become 
   # too conservative.
   
@@ -230,9 +212,9 @@ test_hypotheses <- function(dat){
   p_value_H1a <- pnorm(z_H1a) # left-tailed test
   H1a <- ifelse(p_value_H1a < alpha, 1, 0)
   
-  # One-tailed tests for H1b - for 'west', 'south', 'east'
-  models <- list(mH1_west, mH1_south, mH1_east)
-  names <- c("west", "south", "east")
+  # One-tailed tests for H1b 
+  models <- list(mH1_w, mH1_nw)
+  names <- c("weird", "non-weird")
   H1b_pvals <- numeric(length(models))
   H1b_results <- numeric(length(models))
   
@@ -250,12 +232,12 @@ test_hypotheses <- function(dat){
   
   # complete test
   H1b <- ifelse(all(H1b_results == 1), 1, 0)
-
+  
   # -----------
   # H2
   
   # feedback increases correction rate
-
+  
   # One-tailed test for H2a
   # Testing if the coefficient for 'feedback' is significantly greater than 0
   b_H2a <- fixef(m_all)["feedback"]
@@ -264,9 +246,9 @@ test_hypotheses <- function(dat){
   p_value_H2a <- 1 - pnorm(z_H2a) # right-tailed test
   H2a <- ifelse(p_value_H2a < alpha, 1, 0)
   
-  # One-tailed tests for H2b - for 'west', 'south', 'east'
-  models <- list(m_west, m_south, m_east)
-  names <- c("west", "south", "east")
+  # One-tailed tests for H2b
+  models <- list(m_w, m_nw)
+  names <- c("weird", "non-weird")
   H2b_pvals <- numeric(length(models))
   H2b_results <- numeric(length(models))
   
@@ -298,9 +280,9 @@ test_hypotheses <- function(dat){
   p_value_H3a <- 1 - pnorm(z_H3a) # right-tailed test
   H3a <- ifelse(p_value_H3a < alpha, 1, 0)
   
-  # One-tailed tests for H3b - for 'west', 'south', 'east'
-  models <- list(m_west, m_south, m_east)
-  names <- c("west", "south", "east")
+  # One-tailed tests for H3b 
+  models <- list(m_w, m_nw)
+  names <- c("weird", "non-weird")
   H3b_pvals <- numeric(length(models))
   H3b_results <- numeric(length(models))
   
@@ -341,10 +323,11 @@ test_hypotheses <- function(dat){
 # ---------------------------------------------------------------------------
 # run simulations
 
-filename <- str_c("PSAsim_wnCllvsm_N",N,"_Nc",N_c,"_Nrep",N_rep,"_",sim_label,".csv")
+filename <- str_c("PSAsim_290424_N",N,"_Nc",N_c,"_Nrep",N_rep,"_","_wratio",weird_ratio,"_",sim_label,".csv")
 d_res <- {}
 for(it in  1:N_rep ){
-  d_line <- test_hypotheses(gen_data(N, N_c))
+  d_line <- test_hypotheses(gen_data(N, N_c, weird_ratio))
   d_res <- rbind(d_res, d_line)
   write_csv(d_res,filename)
 }
+

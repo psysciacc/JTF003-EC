@@ -8,4 +8,4 @@
 #$ -l mem_free=10G
 #$ -m be
 #$ -M ml19179@essex.ac.uk
-./PSA_pwr_script_cluster_nov23.R $1 $2 $3 $4
+./PSA_pwr_script_cluster.R $1 $2 $3 $4 $5
