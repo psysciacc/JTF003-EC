@@ -19,7 +19,6 @@ library(tidyverse)
 library(lme4)
 ```
 
-
 ## Command Arguments
 
 The power analyses script `power-script-cluster.R` is designed to be run via Rscript in command line and receive some parameters as input. The simulation variable settings are as follow:
@@ -79,7 +78,6 @@ The first part of the power simulation script consists the setting of key simula
 
 - `n_trial` is set to 6 as we have 6 CRT problems in the study.
 
-
 ```{r}
 # these are plausible parameter values based on Sirota 2023 and similar 
 # article in the literature
@@ -119,8 +117,6 @@ rfx_sd_country  <- (0.19 * (pi/sqrt(3))) / 2
 n_trial <- 6
 ```
 
-
-
 ## Generate Data Function
 
 This function generate a simulated dataset based on input values. In words, this function
@@ -156,8 +152,9 @@ gen_data <- function(N, N_c, weird_ratio){
   N_tot <- N * N_c * 4 # 4 is the number of between subjects conditions
   
   ## simulate dataset
-  
   # simulate error propensity of individual participants in phase 1
+  # simulate number of errors in phase 1
+  # number of errors (log(errors))
   error_lo <- rnorm(N_tot, mean=err_mu, sd=err_sd)
   
   # simulate random effects and between-individual variability 
@@ -187,15 +184,20 @@ gen_data <- function(N, N_c, weird_ratio){
   
   # set log-odds of p(correction) for each datapoint
   dat <- dat %>%
+    # control group, baseline who don't get anything (beta_lo_p[1])
+    # intercept (control group mean because X1 is the group they are in)
+    # intercept beta_lo_p[1] + group*0 + country random + person random effect
     mutate(lo = beta_lo_p[1]+rfx_country+rfx_id) %>%
     mutate(lo = case_when(
+      # when group 1 baseline keep the original estimation from the line above 
       condition==1 ~ lo,
+      # when group is not baseline (feedback, justification, both) then add in the effect of those other conditions 
       condition==2 ~ lo + beta_lo_p[2],
       condition==3 ~ lo + beta_lo_p[3],
       condition==4 ~ lo + beta_lo_p[4]
     ))
   
-  # simulate number of errors
+  # simulate number of errors ##stopped here## 
   dat$error <- rbinom(nrow(dat), size=1, p=exp(dat$error_lo)/(1+exp(dat$error_lo)))
   
   # simulate number of errors that are corrected in phase 2
@@ -246,10 +248,7 @@ generate_labels <- function(N_c, weird_ratio = 0.5) {
 }
 ```
 
-
-
 ## Test hypotheses Function
-
 
 The function below test all the hypotheses as outlined in the manuscript. Note that the dependent variable is slightly different for H1a and H1b compared to the other hypotheses. Specifically, for hypotheses H1A and H1B the variable of interest is the proportion of correct responses made in phase 2 (out of all correct responses given in phase 1 and 2); in set notation, this would be $\frac{|C_2|}{|C_1 \cup C_2|}$ where $C_1$ and $C_2$ are the items correctly answered in phase 1 and 2, respectively. 
 
@@ -434,7 +433,6 @@ test_hypotheses <- function(dat){
 }
 ```
 
-
 ## Results
 
 Running the script `PSA_pwr_script_cluster.R` on multiple cores would return multiple `*.csv` files. Assuming these are all placed in a folder called `results` these can be combined simply by running
@@ -445,7 +443,6 @@ csv_files <- list.files(path = folder_path, pattern = "*.csv", full.names = TRUE
 d <- bind_rows(lapply(csv_files, read.csv))
 ```
 
-
 We have already combined several runs of the simulations in the file `power_sim_results.csv`
 
 ```{r}
@@ -455,13 +452,13 @@ str(d)
 
 here `smaller_fraction` is an additional variable that correspond to the fraction of countries in the smaller category, which was added when the results were compiled to identify runs with different values of `weird_ratio`. Below we report code and plots of estimated power separately for 50-50, 60-40 and 70-30 splits of countries in cultural categories.
 
-For the plots, binomial standard errors for each set of simulations are computed with 
+For the plots, binomial standard errors for each set of simulations are computed with: 
+
 ```{r}
 binomSEM <- function (v) {
     sqrt((mean(v) * (1 - mean(v)))/length(v))
 }
 ```
-
 
 ### 50-50
 
@@ -543,7 +540,6 @@ d %>%
 
 ```
 
-
 ### 60-40
 
 ```{r, fig.align='center'}
@@ -623,7 +619,6 @@ d %>%
   theme_minimal()
 
 ```
-
 
 ### 70-30
 
