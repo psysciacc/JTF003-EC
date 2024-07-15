@@ -1,0 +1,313 @@
+---
+title: "Power Analyses"
+author: "Erin Buchanan, Matteo Lisi"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+
+```{r}
+library(tidyverse)
+library(lme4)
+```
+
+## Parameter Settings
+
+The first part of the power simulation script consists the setting of key simulation parameters
+
+- `err_mu` and `err_sd` are the mean and SD across participants of error rates (probability of answering a CRT problem incorrectly in the first intuitive phase), expressed in a log-odds scale;
+
+- `corr_mu`, and `corr_sd` are mean and SD across participants of correction rates - that is the probability that an error in the first intuitive phase is corrected in the second deliberative phase (see manuscript for details of the method);
+
+- `beta_lo_p` represented differences in correction rates between each condition [feedback, justification, both] relative to the baseline condition.
+
+- `n_trial` is set to 6 as we have 6 CRT problems in the study.
+
+```{r}
+# these are plausible parameter values based on Sirota 2023 and similar 
+# article in the literature
+
+# p(error @ stage 1)
+err_mu <- 1.22
+err_sd <- 0.92
+
+# p(correct @ stage 2 | error @ stage 1) 
+corr_mu <- -2.53  
+corr_sd <- 1.12
+
+# set effect sizes ----
+
+# Set effect values in standardized as Cohen's d and rescale 
+# to an approximately similar value for the logistic distribution; 
+# specifically we multiply the d values by the ratio of the standard deviation
+# of the logistic distribution to that of the standard normal distribution, 
+# which is (pi/sqrt(3)).
+d_fdbk <- 0.19 * (pi/sqrt(3)) # feedback minus baseline
+d_just <- 0.19 * (pi/sqrt(3)) # justification minus baseline
+d_both <- (d_fdbk + d_just)  # (feedback + justification) minus baseline 
+# Note: we expects the effects of feedback to be additive
+
+# vector of fixed-effects coefficients
+beta_lo_p <- c(corr_mu, NA, NA, NA)
+beta_lo_p[2] <- d_fdbk
+beta_lo_p[3] <- d_just
+beta_lo_p[4] <- d_both
+
+# determine the country-level random effect SD
+# half the group-level effect size, so that ~95% of countries have 
+# population-level effects of the same sign
+rfx_sd_country  <- (0.19 * (pi/sqrt(3))) / 2 
+
+# power simulation parameters ----
+n_trial <- 6
+```
+
+## Generate Data Function
+
+This function generate a simulated dataset based on input values. In words, this function
+
+1. sample simulated log-odds of errors in intuitive phase (`error_lo`) for each participants from the population distribution defined by `err_mu` and `err_sd`. If we write as $\log \text{OR}_p $ the log-odds that participant $p$ makes an error in the intuitive phase, we can write this step as $$\log \text{OR}_p \sim \mathcal{N}(\mu=\text{err_mu}, \sigma=\text{err_sd})$$. 
+
+2. sample individual deviation from the mean log-odds of correcting errors in phase 2 (`rfx_id`) as well as country-specific deviations (`rfx_country`);
+
+3. determine the log-dds of correcting errors of each participant (`lo`) taking into account both the country and the condition they are in.
+
+4. Sample the actual number of errors (using `rbinom`) to generate number of errors in the intuitive phase (`dat$error`) and how many of these are corrected in the second deliberative phase (`dat$corrected`). For example, the number of error in phase 1 pf participant $p$ would be notated as $$ \text{N. errors}_p \sim \text{Binomial} \left(\frac{\exp(\log \text{OR}_p)}{1+\exp(\log \text{OR}_p)}, \, 6 \right)$$
+
+```{r}
+# data simulation function
+# data simulation function
+gen_data <- function(N, N_c, weird_ratio){
+  
+  N_tot <- N * N_c * 4 # 4 is the number of between subjects conditions
+  
+  ## simulate dataset
+  # simulate error propensity of individual participants in phase 1
+  # simulate number of errors in phase 1
+  # number of errors (log(errors))
+  error_lo <- rnorm(N_tot, mean=err_mu, sd=err_sd)
+  
+  # simulate random effects and between-individual variability 
+  # (to introduce heterogeneity and make simulations more realistic)
+  rfx_id <- rnorm(N_tot, mean=0, sd=corr_sd)
+  
+  # sample countries
+  rfx_country <- rnorm(N_c, mean=0, sd=rfx_sd_country)
+  group_country <- generate_labels(N_c, weird_ratio)   
+  
+  # create dataset frame
+  dat <- expand_grid(country = 1:N_c,
+                     condition = 1:4,
+                     id = 1:N,
+                     trial=1:6) %>%
+    mutate(id = str_c(id,country,condition,sep="_"))
+  dat$country_group <- group_country[dat$country]
+  
+  # simulate responses
+  dat$corrected <- NA
+  dat$error <- NA
+  dat$id <- as.integer(factor(dat$id, labels=1:length(unique(dat$id))))
+  dat$lo <- NA
+  dat$error_lo <- error_lo[dat$id]
+  dat$rfx_country <- rfx_country[dat$country]
+  dat$rfx_id <- rfx_id[dat$id]
+  
+  # set log-odds of p(correction) for each datapoint
+  dat <- dat %>%
+    # control group, baseline who don't get anything (beta_lo_p[1])
+    # intercept (control group mean because X1 is the group they are in)
+    # intercept beta_lo_p[1] + group*0 + country random + person random effect
+    mutate(lo = beta_lo_p[1]+rfx_country+rfx_id) %>%
+    mutate(lo = case_when(
+      # when group 1 baseline keep the original estimation from the line above 
+      condition==1 ~ lo,
+      # when group is not baseline (feedback, justification, both) then add in the effect of those other conditions 
+      condition==2 ~ lo + beta_lo_p[2],
+      condition==3 ~ lo + beta_lo_p[3],
+      condition==4 ~ lo + beta_lo_p[4]
+    ))
+  
+  # simulate number of errors ##stopped here## 
+  dat$error <- rbinom(nrow(dat), size=1, p=exp(dat$error_lo)/(1+exp(dat$error_lo)))
+  
+  # simulate number of errors that are corrected in phase 2
+  dat$corrected <- ifelse(dat$error==1,
+                          rbinom(nrow(dat), size=1, p=exp(dat$lo)/(1+exp(dat$lo))),
+                          0)
+  
+  # total correct responses
+  dat$correct <- 1-dat$error + dat$corrected
+  
+  # keep only trials with errors in phase 1
+  dat <- dat %>%
+    # filter(error==1) %>%
+    mutate(c_F = ifelse(condition==2,1,0),
+           c_FR = ifelse(condition==3,1,0)) %>%
+    mutate(feedback=ifelse(condition==2 | condition==4, 1, 0),
+           justification=ifelse(condition==3 | condition==4, 1, 0),
+           condition = case_when(
+             condition==1 ~ "baseline",
+             condition==2 ~ "feedback",
+             condition==3 ~ "justification",
+             condition==4 ~ "feedback+justification"
+           ))
+  
+  dat$country_group <- factor(dat$country_group)
+  
+  # Set attributes
+  attr(dat, "N") <- N
+  attr(dat, "N_c") <- N_c
+  
+  # return simulated data
+  return(dat)
+}
+```
+
+Note that the function above calls also this other function to generate a set of labels `weird`/`non-weird` to allocate the simulated countries in one cultural category or the other randomly.
+
+```{r}
+# country grouping labels
+generate_labels <- function(N_c, weird_ratio = 0.5) {
+  n_weird <- round(weird_ratio * N_c)
+  n_nonweird <- N_c - n_weird
+  labels <- c(
+      rep("weird", n_weird),
+      rep("non-weird", n_nonweird)
+    )[sample(N_c)]
+  return(labels)
+}
+```
+
+## Test hypotheses Function
+
+The function below test all the hypotheses as outlined in the manuscript. Note that the dependent variable is slightly different for H1a and H1b compared to the other hypotheses. Specifically, for hypotheses H1A and H1B the variable of interest is the proportion of correct responses made in phase 2 (out of all correct responses given in phase 1 and 2); in set notation, this would be $\frac{|C_2|}{|C_1 \cup C_2|}$ where $C_1$ and $C_2$ are the items correctly answered in phase 1 and 2, respectively. 
+
+For the remaining hypotheses, the variable of interest is the probability that participants correct their errors in phase 2; in set notation this would be $\frac{|E_1 \cap C_2|}{|E_1|}$, where $E_1$ indicate the items incorrectly answered in phase 1.
+
+```{r}
+test_hypotheses <- function(dat){
+  
+  require(lme4)
+  # dat <- gen_data(100, 30, 0.6)
+  
+  dat_H1 <- dat %>%
+    filter(correct==1)
+  
+  dat <- dat %>%
+    filter(error==1)
+  
+  ## FIT MODELS
+  m_all <- glmer(corrected ~ feedback * justification + (feedback * justification||country),
+               family=binomial("logit"), data=dat,
+               control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
+  
+  # now fit models for H1 specifically: note that here the dependent variable is different
+  # as the hypothesis is about the proportion of correct response (out of all correct responses)
+  # that are corrected in phase 2 ('data' arguments is set to 'dat_H1' instead of just 'dat')
+  # 
+  mH1_all <- glmer(corrected ~ feedback * justification + (feedback * justification||country),
+                   family=binomial("logit"), data=dat_H1,
+                   control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
+  
+  # get results
+  # Testing if the intercept is significantly less than 0
+  mH1_coef <- coef(summary(mH1_all))
+  
+  # Testing if the coefficient for 'feedback' is significantly greater than 0
+  # Testing if the coefficient for 'justification' is significantly greater than 0
+  mH23_coef <- coef(summary(m_all))
+  
+  # Testing country level power necessary for each random effect
+  mH1_random <- coef(mH1_all)$country
+  mH23_random <- coef(m_all)$country
+  
+  # retrieve settings
+  N <- attr(dat, "N")
+  N_c <- attr(dat, "N_c")
+  N_tot <- N * N_c * 4
+  
+  
+  DF_coef <- bind_rows(
+    data.frame(mH1_coef) %>% 
+      mutate(coef = c("Intercept", "feedback", "justification", "interaction"),
+             N = N, 
+             N_c = N_c,
+             N_tot = N_tot,
+             model = "hyp 1")
+    ,
+    data.frame(mH23_coef) %>% 
+      mutate(coef = c("Intercept", "feedback", "justification", "interaction"),
+             N = N, 
+             N_c = N_c,
+             N_tot = N_tot,
+             model = "hyp 2-3")
+  )
+  
+  DF_random <- bind_rows(
+    mH1_random %>% 
+      mutate(N = N, 
+             N_c = N_c,
+             N_tot = N_tot,
+             model = "hyp 1"),
+    mH23_random %>% 
+      mutate(N = N, 
+             N_c = N_c,
+             N_tot = N_tot,
+             model = "hyp 2-3")
+  )
+  
+  
+  
+  return(
+    list(
+      DF_coef,
+      DF_random
+    )
+  )
+  
+}
+```
+
+## Run Power
+
+```{r}
+N <- seq(from = 50, to = 250, by = 10)
+N_c <- seq(from = 30, to = 50, by = 2)
+N_rep <- 5 # change later 
+
+coefficients_list <- list()
+randoms_list <- list()
+total_iter <- 1
+
+# run over N
+for (sample_size in 1:length(N)){
+  # run over N_c
+  for (country_size in 1:length(N_c)){
+    # run N_rep times
+    for (iteration in 1:N_rep){
+      
+      DF_temp <- gen_data(N[sample_size], 
+                          N_c[country_size],
+                          weird_ratio = .5) # not used here
+      
+      output_temp <- test_hypotheses(DF_temp)
+      
+      coefficients_list[[total_iter]] <- output_temp$DF_coef
+      randoms_list[[total_iter]] <- output_temp$DF_random
+      
+      # keep track for list adding
+      total_iter <- total_iter + 1
+    }
+    
+  }
+  
+}
+```
