@@ -11,7 +11,7 @@
 
 <meta name="author" content="Erin Buchanan, Matteo Lisi" />
 
-<meta name="date" content="2024-06-07" />
+<meta name="date" content="2024-07-21" />
 
 <title>Power Analyses</title>
 
@@ -1481,7 +1481,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">Power Analyses</h1>
 <h4 class="author">Erin Buchanan, Matteo Lisi</h4>
-<h4 class="date">2024-06-07</h4>
+<h4 class="date">2024-07-21</h4>
 
 </div>
 
@@ -1649,8 +1649,9 @@ gen_data &lt;- function(N, N_c, weird_ratio){
   N_tot &lt;- N * N_c * 4 # 4 is the number of between subjects conditions
   
   ## simulate dataset
-  
   # simulate error propensity of individual participants in phase 1
+  # simulate number of errors in phase 1
+  # number of errors (log(errors))
   error_lo &lt;- rnorm(N_tot, mean=err_mu, sd=err_sd)
   
   # simulate random effects and between-individual variability 
@@ -1680,15 +1681,20 @@ gen_data &lt;- function(N, N_c, weird_ratio){
   
   # set log-odds of p(correction) for each datapoint
   dat &lt;- dat %&gt;%
+    # control group, baseline who don&#39;t get anything (beta_lo_p[1])
+    # intercept (control group mean because X1 is the group they are in)
+    # intercept beta_lo_p[1] + group*0 + country random + person random effect
     mutate(lo = beta_lo_p[1]+rfx_country+rfx_id) %&gt;%
     mutate(lo = case_when(
+      # when group 1 baseline keep the original estimation from the line above 
       condition==1 ~ lo,
+      # when group is not baseline (feedback, justification, both) then add in the effect of those other conditions 
       condition==2 ~ lo + beta_lo_p[2],
       condition==3 ~ lo + beta_lo_p[3],
       condition==4 ~ lo + beta_lo_p[4]
     ))
   
-  # simulate number of errors
+  # simulate number of errors ##stopped here## 
   dat$error &lt;- rbinom(nrow(dat), size=1, p=exp(dat$error_lo)/(1+exp(dat$error_lo)))
   
   # simulate number of errors that are corrected in phase 2
@@ -1744,7 +1750,8 @@ manuscript. Note that the dependent variable is slightly different for
 H1a and H1b compared to the other hypotheses. Specifically, for
 hypotheses H1A and H1B the variable of interest is the proportion of
 correct responses made in phase 2 (out of all correct responses given in
-phase 1 and 2); in set notation, this would be <span class="math inline">\(\frac{|C_2|}{|C_1 \cup C_2|}\)</span> where <span class="math inline">\(C_1\)</span> and <span class="math inline">\(C_2\)</span> are the items correctly answered in
+phase 1 and 2); in set notation, this would be <span class="math inline">\(\frac{|C_2 \setminus C_1|}{|C_1 \cup
+C_2|}\)</span> where <span class="math inline">\(C_1\)</span> and <span class="math inline">\(C_2\)</span> are the items correctly answered in
 phase 1 and 2, respectively.</p>
 <p>For the remaining hypotheses, the variable of interest is the
 probability that participants correct their errors in phase 2; in set
@@ -1980,7 +1987,7 @@ values of <code>weird_ratio</code>. Below we report code and plots of
 estimated power separately for 50-50, 60-40 and 70-30 splits of
 countries in cultural categories.</p>
 <p>For the plots, binomial standard errors for each set of simulations
-are computed with</p>
+are computed with:</p>
 <pre class="r"><code>binomSEM &lt;- function (v) {
     sqrt((mean(v) * (1 - mean(v)))/length(v))
 }</code></pre>

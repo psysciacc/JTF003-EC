@@ -250,7 +250,7 @@ generate_labels <- function(N_c, weird_ratio = 0.5) {
 
 ## Test hypotheses Function
 
-The function below test all the hypotheses as outlined in the manuscript. Note that the dependent variable is slightly different for H1a and H1b compared to the other hypotheses. Specifically, for hypotheses H1A and H1B the variable of interest is the proportion of correct responses made in phase 2 (out of all correct responses given in phase 1 and 2); in set notation, this would be $\frac{|C_2|}{|C_1 \cup C_2|}$ where $C_1$ and $C_2$ are the items correctly answered in phase 1 and 2, respectively. 
+The function below test all the hypotheses as outlined in the manuscript. Note that the dependent variable is slightly different for H1a and H1b compared to the other hypotheses. Specifically, for hypotheses H1A and H1B the variable of interest is the proportion of correct responses made in phase 2 (out of all correct responses given in phase 1 and 2); in set notation, this would be $\frac{|C_2 \setminus C_1|}{|C_1 \cup C_2|}$ where $C_1$ and $C_2$ are the items correctly answered in phase 1 and 2, respectively. 
 
 For the remaining hypotheses, the variable of interest is the probability that participants correct their errors in phase 2; in set notation this would be $\frac{|E_1 \cap C_2|}{|E_1|}$, where $E_1$ indicate the items incorrectly answered in phase 1.
 
