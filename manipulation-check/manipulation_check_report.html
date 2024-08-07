@@ -13,7 +13,7 @@
 
 <meta name="date" content="2024-05-20" />
 
-<title>Analysis manipulation check (response justification)</title>
+<title>Manipulation Pretest: analyses &amp; results</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -668,8 +668,8 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">Analysis manipulation check (response
-justification)</h1>
+<h1 class="title toc-ignore">Manipulation Pretest: analyses &amp;
+results</h1>
 <h4 class="author">Matteo Lisi</h4>
 <h4 class="date">2024-05-20</h4>
 
@@ -681,14 +681,17 @@ justification)</h1>
 prepare data</a>
 <ul>
 <li><a href="#r-session" id="toc-r-session">R session</a></li>
-<li><a href="#dataset" id="toc-dataset">Dataset</a></li>
+<li><a href="#dataset" id="toc-dataset">Dataset</a>
+<ul>
+<li><a href="#experimental-conditions" id="toc-experimental-conditions">Experimental conditions</a></li>
+</ul></li>
 <li><a href="#completion-rates" id="toc-completion-rates">Completion
 rates</a></li>
 <li><a href="#exclusions" id="toc-exclusions">Exclusions</a></li>
 <li><a href="#demographics-information-of-participants" id="toc-demographics-information-of-participants">Demographics
 information of participants</a></li>
-<li><a href="#put-data-in-long-format-for-analyses" id="toc-put-data-in-long-format-for-analyses">Put data in long format
-for analyses</a></li>
+<li><a href="#data-transformation" id="toc-data-transformation">Data
+Transformation</a></li>
 <li><a href="#summary-statistics" id="toc-summary-statistics">Summary
 statistics</a></li>
 <li><a href="#summary-statistics-by-crt-problem" id="toc-summary-statistics-by-crt-problem">Summary statistics by CRT
@@ -716,6 +719,8 @@ of reported use of external resources on accuracy.</a></li>
 </ul></li>
 <li><a href="#familiarity" id="toc-familiarity">Familiarity</a>
 <ul>
+<li><a href="#familiarity-overall-counts-and-proportion-of-responses" id="toc-familiarity-overall-counts-and-proportion-of-responses">Familiarity:
+overall counts and proportion of responses</a></li>
 <li><a href="#effects-of-familiarity-on-accuracy" id="toc-effects-of-familiarity-on-accuracy">Effects of familiarity on
 accuracy</a></li>
 </ul></li>
@@ -736,25 +741,28 @@ library(patchwork)</code></pre>
 </div>
 <div id="dataset" class="section level2">
 <h2>Dataset</h2>
-<p>Load dataset; note that the data in
+<p>Please note that the data in
 <code>manip_test_noOverlap_anonim.csv</code> have been already
-anonimized (<code>PROLIFIC_PID</code> has been replaced with an
-anonymous code) and do not contain the participants that also did the
-reading pre-test.</p>
+anonymised (<code>PROLIFIC_PID</code> has been replaced with an
+anonymous code) and do not contain the participants that also
+participated in the reading pre-test.</p>
 <pre class="r"><code>d &lt;- read_csv(&quot;./manip_test_noOverlap_anonim.csv&quot;)</code></pre>
+<div id="experimental-conditions" class="section level3">
+<h3>Experimental conditions</h3>
 <p>The three conditions in this experiment are the following</p>
 <ul>
-<li><strong>CG</strong> control groupd</li>
-<li><strong>BJ</strong> baseline (standard wording for response
-justification)</li>
-<li><strong>IJ</strong> ‘improved’ wording for response
-justification</li>
+<li><strong>CG</strong>: Control Group</li>
+<li><strong>BJ</strong>: Baseline Justification (standard wording for
+response justification)</li>
+<li><strong>IJ</strong>: Improved Justification (enhanced wording for
+response justification)</li>
 </ul>
+</div>
 </div>
 <div id="completion-rates" class="section level2">
 <h2>Completion rates</h2>
-<p>To compute the completion rates I have excluded previews, and
-determined the group (condition) based on the first click of the
+<p>To compute the completion rates, previews have been excluded. The
+group (condition) assignment was determined from the first click in the
 practice trial.</p>
 <pre class="r"><code>dropout_rates &lt;- d %&gt;%
   filter(Status == 0) %&gt;%
@@ -772,10 +780,9 @@ practice trial.</p>
     Total_Participants = n(),
     Dropouts = sum(Completed == 0),
     Dropout_Rate = Dropouts / Total_Participants
-  )</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;PROLIFIC_PID&#39;. You can override using the
-## `.groups` argument.</code></pre>
-<pre class="r"><code>print(dropout_rates)</code></pre>
+  )
+
+print(dropout_rates)</code></pre>
 <pre><code>## # A tibble: 4 × 4
 ##   group Total_Participants Dropouts Dropout_Rate
 ##   &lt;chr&gt;              &lt;int&gt;    &lt;int&gt;        &lt;dbl&gt;
@@ -786,8 +793,8 @@ practice trial.</p>
 </div>
 <div id="exclusions" class="section level2">
 <h2>Exclusions</h2>
-<p>First we compute a table with the breakdown of how many participants
-are excluded for each criteria.</p>
+<p>The following table provides a breakdown of the number of
+participants excluded based on each criterion.</p>
 <pre class="r"><code>total_initial &lt;- nrow(d)
 
 # Status == 0
@@ -930,21 +937,18 @@ criteria.</p>
          Finished == 1, 
          Status == 0, 
          Q_RecaptchaScore &gt;= 0.5)</code></pre>
-<p>Check if there are any duplicated response (the same Prolific ID with
-more than 1 response)</p>
+<p>Check for duplicated responses (same Prolific ID with more than one
+response):</p>
 <pre class="r"><code>n_pid &lt;- tapply(d$PROLIFIC_PID, d$PROLIFIC_PID, length)
 length(n_pid[n_pid==2])</code></pre>
 <pre><code>## [1] 2</code></pre>
-<p>These IDs have completed the survey twice</p>
+<p>These participants completed the survey twice:</p>
 <pre class="r"><code>duplicate_id &lt;- names(n_pid[n_pid==2])
 duplicate_id</code></pre>
 <pre><code>## [1] &quot;mc493&quot; &quot;mc589&quot;</code></pre>
-<!-- I will remove them for this analysis -->
-<!-- ```{r} -->
-<!-- d <- d[!is.element(d$PROLIFIC_PID, duplicate_id),] -->
-<!-- ``` -->
-<p>I will include only the first response (based on the response date
-and time) for each duplicate ID.</p>
+<p>To ensure data quality, only the first response (based on response
+date and time) for each duplicate ID will be included in the
+analysis:</p>
 <pre class="r"><code># keep in only the first response for each duplicate
 duplicates &lt;- d %&gt;%
   filter(PROLIFIC_PID %in% duplicate_id) %&gt;%
@@ -957,7 +961,7 @@ duplicates &lt;- d %&gt;%
 non_duplicates &lt;- d %&gt;%
   filter(!PROLIFIC_PID %in% duplicate_id)
 
-# put them ack together
+# put them back together
 d &lt;- bind_rows(duplicates, non_duplicates)</code></pre>
 <!-- ```{r, include=FALSE} -->
 <!-- write_csv(d, "manipcheckdata_afterExclusions.csv") -->
@@ -1026,10 +1030,11 @@ N. female
 </tbody>
 </table>
 </div>
-<div id="put-data-in-long-format-for-analyses" class="section level2">
-<h2>Put data in long format for analyses</h2>
-<p>For simplicity, I do this separately for each condition (CG, BJ and
-IJ) and then put them together.</p>
+<div id="data-transformation" class="section level2">
+<h2>Data Transformation</h2>
+<p>To prepare the data for analysis, we transform it into a long format.
+This is done separately for each condition (CG, BJ, and IJ) and then
+combined.</p>
 <pre class="r"><code># CG
 crt_CG &lt;- d %&gt;% select(PROLIFIC_PID, matches(&quot;^crt[0-9]+_CG&quot;))
 crt_CG &lt;- crt_CG %&gt;%
@@ -1082,22 +1087,22 @@ dag &lt;- dat %&gt;%
             N = n(),
             accuracy=mean(accuracy, na.rm=T)) %&gt;%
   mutate(errors = N-correct) %&gt;%
-  filter(!is.nan(accuracy))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;PROLIFIC_PID&#39;. You can override using the
-## `.groups` argument.</code></pre>
-<pre class="r"><code># sanity check 
+  filter(!is.nan(accuracy))
+  
+# sanity check 
 all(dag$N==6)</code></pre>
 <pre><code>## [1] TRUE</code></pre>
-<pre class="r"><code>dag[is.element(dag$PROLIFIC_PID,sample(dag$PROLIFIC_PID,5)),] # 5 random IDs</code></pre>
+<pre class="r"><code># display 5 random IDs
+dag[is.element(dag$PROLIFIC_PID,sample(dag$PROLIFIC_PID,5)),]</code></pre>
 <pre><code>## # A tibble: 5 × 6
 ## # Groups:   PROLIFIC_PID [5]
 ##   PROLIFIC_PID group correct     N accuracy errors
 ##   &lt;chr&gt;        &lt;fct&gt;   &lt;dbl&gt; &lt;int&gt;    &lt;dbl&gt;  &lt;dbl&gt;
-## 1 mc1058       CG          5     6    0.833      1
-## 2 mc154        IJ          1     6    0.167      5
-## 3 mc1719       IJ          5     6    0.833      1
-## 4 mc1818       BJ          6     6    1          0
-## 5 mc915        CG          5     6    0.833      1</code></pre>
+## 1 mc2075       BJ          4     6    0.667      2
+## 2 mc211        BJ          5     6    0.833      1
+## 3 mc56         CG          5     6    0.833      1
+## 4 mc920        CG          3     6    0.5        3
+## 5 mc96         IJ          3     6    0.5        3</code></pre>
 </div>
 <div id="summary-statistics" class="section level2">
 <h2>Summary statistics</h2>
@@ -1109,10 +1114,9 @@ all(dag$N==6)</code></pre>
   summarise(
     Accuracy = sprintf(&quot;%.2f (%.2f)&quot;, mean(accuracy, na.rm = TRUE), sd(accuracy, na.rm = TRUE)),
     `Response time` = sprintf(&quot;%.2f (%.2f)&quot;, mean(RT, na.rm = TRUE), sd(RT, na.rm = TRUE))
-  )  </code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;PROLIFIC_PID&#39;. You can override using the
-## `.groups` argument.</code></pre>
-<pre class="r"><code>knitr::kable(stat_summary, format = &quot;html&quot;, booktabs = TRUE, caption = &quot;Summary statistics (accuracy and response time); values reported as mean (Std.) across participants.&quot;) %&gt;%
+  )  
+
+knitr::kable(stat_summary, format = &quot;html&quot;, booktabs = TRUE, caption = &quot;Summary statistics (accuracy and response time); values reported as mean (Std.) across participants.&quot;) %&gt;%
   kable_styling(latex_options = c(&quot;scale_down&quot;,&quot;striped&quot;))</code></pre>
 <table class="table" style="color: black; margin-left: auto; margin-right: auto;">
 <caption>
@@ -1181,10 +1185,9 @@ IJ
     names_from = group, 
     values_from = c(Accuracy, RT),
     names_sep = &quot; &quot;
-  )</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;crt&#39;. You can override using the `.groups`
-## argument.</code></pre>
-<pre class="r"><code>knitr::kable(stat_summary, format = &quot;html&quot;, booktabs = TRUE, caption = &quot;Summary statistics of accuracy and response time for individual CRT problems&quot;)%&gt;%
+  )
+
+knitr::kable(stat_summary, format = &quot;html&quot;, booktabs = TRUE, caption = &quot;Summary statistics of accuracy and response time for individual CRT problems&quot;)%&gt;%
   kable_styling(latex_options = c(&quot;scale_down&quot;,&quot;striped&quot;))</code></pre>
 <table class="table" style="color: black; margin-left: auto; margin-right: auto;">
 <caption>
@@ -1361,8 +1364,8 @@ crt6
 </div>
 <div id="effect-of-response-justification-on-accuracy" class="section level1">
 <h1>Effect of response justification on accuracy</h1>
-<p>Firstly, we recode the contrasts of condition (<code>group</code>)
-such that the control group is the baseline.</p>
+<p>First, we recode the contrasts of condition (<code>group</code>) such
+that the control group is the baseline.</p>
 <ul>
 <li><code>CG</code> control group</li>
 <li><code>BJ</code> response justification</li>
@@ -1375,16 +1378,14 @@ contrasts(dag$group)</code></pre>
 ## BJ  1  0
 ## CG  0  0
 ## IJ  0  1</code></pre>
-<p>Next, I compare difference in accuracy between groups using a
-logistic regression. I have used a random effects model, with random
-intercepts by participants and item (similar results would be obtained
-with a simple logistic regression).</p>
+<p>Next, we compare the differences in accuracy between groups using
+logistic regression. A random effects model with random intercepts by
+participants and items is employed</p>
 <pre class="r"><code>dag_acc &lt;- dat %&gt;%
   group_by(PROLIFIC_PID, group, crt) %&gt;%
-  summarise(accuracy=mean(accuracy, na.rm=T))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;PROLIFIC_PID&#39;, &#39;group&#39;. You can override
-## using the `.groups` argument.</code></pre>
-<pre class="r"><code>m_logi &lt;- glmer(accuracy ~ group  + (1|PROLIFIC_PID) + (1|crt), family=binomial(&quot;logit&quot;), data=dag_acc, control=glmerControl(optimizer=&quot;bobyqa&quot;))
+  summarise(accuracy=mean(accuracy, na.rm=T))
+
+m_logi &lt;- glmer(accuracy ~ group  + (1|PROLIFIC_PID) + (1|crt), family=binomial(&quot;logit&quot;), data=dag_acc, control=glmerControl(optimizer=&quot;bobyqa&quot;))
 
 summary(m_logi)</code></pre>
 <pre><code>## Generalized linear mixed model fit by maximum likelihood (Laplace
@@ -1537,19 +1538,19 @@ Observations
 </table>
 <div id="standardized-effect-sizes" class="section level3">
 <h3>Standardized effect sizes</h3>
-<p>To the best of my knowledge, there is no universally accepted way to
-convert odds-ratio (as obtained from the logixtic regression) to Cohen’s
-<em>d</em>. A common way to approximately map odds-ratios to <em>d</em>
-values is by scaling by the standard deviation of the logistic
-distribution <span class="math inline">\(\pi \sqrt{3}\)</span>.</p>
+<p>The correspondence between Cohen’s <em>d</em> and odds ratios can
+only be approximate. A common approach to mapping odds ratios to
+<em>d</em> values is by scaling by the standard deviation of the
+logistic distribution <span class="math inline">\(\pi
+\sqrt{3}\)</span>.</p>
 <p>This gives the following:</p>
 <pre class="r"><code>(fixef(m_logi)[2:3] * sqrt(3)) / pi</code></pre>
 <pre><code>##   groupBJ   groupIJ 
 ## 0.2178344 0.2165222</code></pre>
-<p>A more straightforward approach could be simply to apply Cohen’s
-classical formula the difference in mean accuracy and divide by the
-pooled standard deviations. This gives the following estimates, which
-numerically are very close to the previous ones.</p>
+<p>Perhaps a more straightforward approach could be simply to apply
+Cohen’s classical formula for the difference in mean accuracy and divide
+by the pooled standard deviations. This provides the following
+estimates, which are numerically very close to the previous ones.</p>
 <pre class="r"><code>pooled_sd &lt;- function(x, y) {
   nx &lt;- length(x)
   ny &lt;- length(y)
@@ -1569,10 +1570,11 @@ CG &lt;- dag$accuracy[dag$group==&quot;CG&quot;]
 </div>
 <div id="does-the-improved-wording-make-a-difference" class="section level2">
 <h2>Does the improved wording make a difference?</h2>
-<p>TO directly test the difference between <code>BJ</code> and
-<code>IJ</code> conditions we can swap the dummy coding. Numerically
-accuracy is slightly higher in <code>IJ</code>, but the below analysis
-indicate that the difference is not statistically significant.</p>
+<p>To directly test the difference between the <code>BJ</code> and
+<code>IJ</code> conditions, we can swap the dummy coding. Although
+numerically the accuracy is slightly higher in the <code>IJ</code>
+condition, the analysis below indicates that the difference is not
+statistically significant.</p>
 <pre class="r"><code>contrasts(dag_acc$group) &lt;- contr.treatment(levels(dag_acc$group), base=1)
 m_logi2 &lt;- glmer(accuracy ~ group  + (1|PROLIFIC_PID) + (1|crt), family=binomial(&quot;logit&quot;), data=dag_acc, control=glmerControl(optimizer=&quot;bobyqa&quot;))
 tab_model(m_logi2, show.r2 = FALSE, show.icc=FALSE)</code></pre>
@@ -1724,8 +1726,8 @@ pl1 + pl2</code></pre>
 </div>
 <div id="length-of-response-justification" class="section level1">
 <h1>Length of response justification</h1>
-<p>Here I look at what people types in the response justification (both
-in terms of raw number of characters and number of words)</p>
+<p>This section examines the content of the response justifications in
+terms of the raw number of characters and the number of words.</p>
 <pre class="r"><code>dat %&gt;%
   filter(group!=&quot;CG&quot;) %&gt;%
   mutate(
@@ -1781,9 +1783,9 @@ IJ
 </tr>
 </tbody>
 </table>
-<p>To compare these statistically, I use a simple t-test. The results
-indicates that people tended to write a bit more in the ‘improved’
-<code>IJ</code> condition.</p>
+<p>To compare these statistically, we use a simple t-test. The results
+indicate that participants tended to write slightly more in the
+‘improved’ <code>IJ</code> condition.</p>
 <pre class="r"><code>dat_length &lt;- dat %&gt;%
   filter(group!=&quot;CG&quot;) %&gt;%
   mutate(
@@ -1793,10 +1795,9 @@ indicates that people tended to write a bit more in the ‘improved’
   summarise(
     average_word_count = mean(word_count, na.rm=T),
     average_char_count = mean(char_count, na.rm=T)
-  )</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;group&#39;. You can override using the
-## `.groups` argument.</code></pre>
-<pre class="r"><code>t.test(dat_length$average_char_count[dat_length$group==&quot;BJ&quot;],
+  )
+  
+t.test(dat_length$average_char_count[dat_length$group==&quot;BJ&quot;],
        dat_length$average_char_count[dat_length$group==&quot;IJ&quot;])</code></pre>
 <pre><code>## 
 ##  Welch Two Sample t-test
@@ -1825,7 +1826,8 @@ indicates that people tended to write a bit more in the ‘improved’
 </div>
 <div id="time-spent" class="section level1">
 <h1>Time spent</h1>
-<p>Here we compare the log-transformed response times</p>
+<p>In this section, we compare the log-transformed response times across
+the different conditions.</p>
 <pre class="r"><code>dag_RT &lt;- dat %&gt;%
   group_by(PROLIFIC_PID, group) %&gt;%
   summarise(correct = sum(accuracy, na.rm=T),
@@ -1834,10 +1836,9 @@ indicates that people tended to write a bit more in the ‘improved’
             RT = mean(`task_rt_Page Submit`, na.rm=T)) %&gt;%
   mutate(errors = N-correct,
          log_RT = log(RT)) %&gt;%
-  filter(!is.nan(accuracy))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;PROLIFIC_PID&#39;. You can override using the
-## `.groups` argument.</code></pre>
-<pre class="r"><code># linear model on log-transformed response times
+  filter(!is.nan(accuracy))
+
+# linear model on log-transformed response times
 m_rt &lt;- lm(log_RT ~ group, dag_RT)
 summary(m_rt)</code></pre>
 <pre><code>## 
@@ -1949,11 +1950,12 @@ dag_RT %&gt;%
   facet_grid(fct_relevel(group, &quot;CG&quot;)~.)+
   theme_minimal()+
   labs(x=&quot;response time&quot;)</code></pre>
-<pre><code>## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</code></pre>
 <p><img src="data:image/png;base64,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" width="576" style="display: block; margin: auto;" /></p>
-<p>Both <code>IJ</code> and <code>BJ</code> have longer response times
-than baseline, and numerically the response time is slightly longer in
-<code>IJ</code> than in in <code>BJ</code> (see also t-test below).</p>
+<p>Both <code>IJ</code> and <code>BJ</code> conditions exhibit longer
+response times compared to the control group (<code>CG</code>).
+Numerically, the response time is slightly longer in the <code>IJ</code>
+condition compared to the <code>BJ</code> condition, as evidenced by the
+t-test below.</p>
 <pre class="r"><code>t.test(log_RT ~ group, dag_RT[dag_RT$group!=&#39;CG&#39;,])</code></pre>
 <pre><code>## 
 ##  Welch Two Sample t-test
@@ -1969,8 +1971,8 @@ than baseline, and numerically the response time is slightly longer in
 </div>
 <div id="perceived-effort" class="section level1">
 <h1>Perceived effort</h1>
-<p>There seems to be no difference in the perceived, self-reported
-effort among all conditions. I test this formally using an ordinal
+<p>There appears to be no difference in the perceived, self-reported
+effort among the conditions. This is tested formally using an ordinal
 logistic model.</p>
 <pre class="r"><code>dag_effort &lt;- dat %&gt;%
   group_by(PROLIFIC_PID) %&gt;%
@@ -2194,9 +2196,9 @@ Observations
 </div>
 <div id="beliefs-about-reviewing-justification" class="section level1">
 <h1>Beliefs about reviewing justification</h1>
-<p>The question here was: <em>How carefully do you believe the
-explanations of your answers to the reasoning problems will be reviewed
-by the research team?</em></p>
+<p>The question posed to participants was: <em>How carefully do you
+believe the explanations of your answers to the reasoning problems will
+be reviewed by the research team?</em></p>
 <p>Participants could choose one of the following options:</p>
 <ol style="list-style-type: decimal">
 <li>Not at all reviewed</li>
@@ -2206,9 +2208,9 @@ by the research team?</em></p>
 <li>Carefully reviewed</li>
 <li>Extremely carefully reviewed</li>
 </ol>
-<p>Here we see that most people report that they believe the
-justification will be reviewed, and this belief seems slightly stronger
-in the <code>IJ</code> condition</p>
+<p>Most participants reported that they believed their justifications
+would be reviewed. This belief appears to be slightly stronger in the
+<code>IJ</code> condition.</p>
 <pre class="r"><code># check review
 dag_review &lt;- dat %&gt;%
   group_by(PROLIFIC_PID) %&gt;%
@@ -2229,6 +2231,8 @@ dag_review %&gt;%
   scale_x_continuous(breaks=seq(1:6))+
   labs(x=&quot;response&quot;)</code></pre>
 <p><img src="data:image/png;base64,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" width="576" style="display: block; margin: auto;" /></p>
+<p>To statistically test this difference, we use an ordinal logistic
+regression model.</p>
 <pre class="r"><code># ordinal model
 dag_review$response &lt;- factor(dag_review$check_review)
 m_review &lt;- clm(response ~ group, data = dag_review)
@@ -2372,8 +2376,9 @@ Observations
 </div>
 <div id="use-of-external-resources" class="section level1">
 <h1>Use of external resources</h1>
-<p>Her we compute first a table indicating the count and fraction of
-participants reporting use of external resources for each CRT item.</p>
+<p>First, we compute a table indicating the count and fraction of
+participants reporting the use of external resources for each CRT
+item.</p>
 <pre class="r"><code># ext_resources
 dag_resources &lt;- dat %&gt;%
   select(starts_with(&quot;ext_resources&quot;),PROLIFIC_PID, group) %&gt;%
@@ -2390,16 +2395,14 @@ dag_resources &lt;- dat %&gt;%
                values_drop_na = TRUE) %&gt;%
   filter(!is.na(ext_resources)) %&gt;%
   mutate(CRT = sub(&quot;.*_(\\d+)$&quot;, &quot;\\1&quot;, CRT), # just polish name
-         used_external = ifelse(ext_resources==1,1,0)) </code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;PROLIFIC_PID&#39;. You can override using the
-## `.groups` argument.</code></pre>
-<pre class="r"><code>dag_accuracy &lt;- dat %&gt;%
+         used_external = ifelse(ext_resources==1,1,0)) 
+
+dag_accuracy &lt;- dat %&gt;%
   mutate(CRT = sub(&quot;crt&quot;, &quot;&quot;, crt)) %&gt;%
   group_by(PROLIFIC_PID, group, CRT) %&gt;%
-  summarise(accuracy = mean(accuracy))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;PROLIFIC_PID&#39;, &#39;group&#39;. You can override
-## using the `.groups` argument.</code></pre>
-<pre class="r"><code>dag_resources &lt;- left_join(dag_resources, dag_accuracy, by=c(&quot;PROLIFIC_PID&quot;, &quot;group&quot;, &quot;CRT&quot;))
+  summarise(accuracy = mean(accuracy))
+
+dag_resources &lt;- left_join(dag_resources, dag_accuracy, by=c(&quot;PROLIFIC_PID&quot;, &quot;group&quot;, &quot;CRT&quot;))
 
 dag_resources %&gt;%
   group_by(CRT, group) %&gt;%
@@ -2414,8 +2417,6 @@ dag_resources %&gt;%
   ) %&gt;%
   knitr::kable(format = &quot;html&quot;, booktabs = TRUE, caption = &quot;Proportion and number of people reporting use of external resources for each CRT item.&quot;)%&gt;%
   kable_styling(latex_options = c(&quot;scale_down&quot;,&quot;striped&quot;))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;CRT&#39;. You can override using the `.groups`
-## argument.</code></pre>
 <table class="table" style="color: black; margin-left: auto; margin-right: auto;">
 <caption>
 Proportion and number of people reporting use of external resources for
@@ -2587,6 +2588,9 @@ count IJ
 </tr>
 </tbody>
 </table>
+<p>There appears to be no significant differences in the use of external
+resources among the groups. This was formally tested using a multilevel
+logistic regression.</p>
 <pre class="r"><code># logistic regression
 dag_resources$response &lt;- dag_resources$ext_resources -1
 m_res &lt;- glmer(response ~ group + (1|PROLIFIC_PID) + (1|CRT), family=binomial(&quot;logit&quot;),data = dag_resources)
@@ -2740,13 +2744,14 @@ Observations
 </table>
 <div id="effects-of-reported-use-of-external-resources-on-accuracy." class="section level2">
 <h2>Effects of reported use of external resources on accuracy.</h2>
-<p>Here we compute the accuracy split by whether people reported to use
-external resources or not. I also run a logistic model that indicates a
-clear effect of use of external resources on accuracy, but there does
-not seem to be an interaction (i.e. it does not seem to be the case that
-people used external resources more carefully/attentively when a
-response justification was required).</p>
-<pre class="r"><code>dag_resources %&gt;%
+<p>We compute the accuracy split by whether participants reported using
+external resources or not. A logistic model indicates a clear effect of
+external resource use on accuracy. However, there does not seem to be an
+interaction effect, suggesting that the presence of response
+justification does not significantly influence the carefulness or
+attentiveness with which participants use external resources.</p>
+<pre class="r"><code># Compute accuracy by external resource use
+dag_resources %&gt;%
   group_by(CRT, group,used_external) %&gt;%
   summarise(
     accuracy = sprintf(&quot;%.2f (%.2f)&quot;, mean(accuracy, na.rm = TRUE), 
@@ -2759,8 +2764,6 @@ response justification was required).</p>
   ) %&gt;%
   knitr::kable(format = &quot;html&quot;, booktabs = TRUE, caption = &quot;Effects of reported use of external resources on accuracy, compute separately for each CRT item. Accuracy here is reported as mean (std.) across participants.&quot;)%&gt;%
   kable_styling(latex_options = c(&quot;scale_down&quot;,&quot;striped&quot;))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;CRT&#39;, &#39;group&#39;. You can override using the
-## `.groups` argument.</code></pre>
 <table class="table" style="color: black; margin-left: auto; margin-right: auto;">
 <caption>
 Effects of reported use of external resources on accuracy, compute
@@ -2993,7 +2996,8 @@ NA
 </tr>
 </tbody>
 </table>
-<pre class="r"><code>dag_resources %&gt;%
+<pre class="r"><code># Compute overall accuracy by external resource use
+dag_resources %&gt;%
   group_by(PROLIFIC_PID, group,used_external) %&gt;%
   summarise(accuracy = mean(accuracy)) %&gt;%
   group_by(group,used_external) %&gt;%
@@ -3008,10 +3012,6 @@ NA
   ) %&gt;%
   knitr::kable(format = &quot;html&quot;, booktabs = TRUE, caption = &quot;Effects of reported use of external resources on accuracy, compute separately for each CRT item. Accuracy here is reported as mean (std.) across participants.&quot;)%&gt;%
   kable_styling(latex_options = c(&quot;scale_down&quot;,&quot;striped&quot;))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;PROLIFIC_PID&#39;, &#39;group&#39;. You can override
-## using the `.groups` argument.
-## `summarise()` has grouped output by &#39;group&#39;. You can override using the
-## `.groups` argument.</code></pre>
 <table class="table" style="color: black; margin-left: auto; margin-right: auto;">
 <caption>
 Effects of reported use of external resources on accuracy, compute
@@ -3065,7 +3065,8 @@ IJ
 </tr>
 </tbody>
 </table>
-<pre class="r"><code>m_accres &lt;- glmer(accuracy ~ group * used_external + (1|PROLIFIC_PID) + (1|CRT), family=binomial(&quot;logit&quot;),data = dag_resources)
+<pre class="r"><code># Fit logistic regression model
+m_accres &lt;- glmer(accuracy ~ group * used_external + (1|PROLIFIC_PID) + (1|CRT), family=binomial(&quot;logit&quot;),data = dag_resources)
 summary(m_accres)</code></pre>
 <pre><code>## Generalized linear mixed model fit by maximum likelihood (Laplace
 ##   Approximation) [glmerMod]
@@ -3266,12 +3267,13 @@ Observations
 </div>
 <div id="familiarity" class="section level1">
 <h1>Familiarity</h1>
-<p>The question was: <em>Have you ever encountered any of the reasoning
-problems listed below before participating in our study?</em></p>
+<p>The question posed to participants was: <em>Have you ever encountered
+any of the reasoning problems listed below before participating in our
+study?</em></p>
 <p>Response options:</p>
 <ol style="list-style-type: decimal">
 <li>yes, I did encounter the same problem before</li>
-<li>yes, I did encounter the same problem before</li>
+<li>yes, I did encounter a very similar problem before</li>
 <li>no, I have not encountered it before</li>
 </ol>
 <pre class="r"><code>dag_fam &lt;- dat %&gt;%
@@ -3288,16 +3290,14 @@ problems listed below before participating in our study?</em></p>
                values_to = &quot;familiarity&quot;,
                values_drop_na = TRUE) %&gt;%
   filter(!is.na(familiarity)) %&gt;%
-  mutate(CRT = sub(&quot;.*_(\\d+)$&quot;, &quot;\\1&quot;, CRT))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;PROLIFIC_PID&#39;. You can override using the
-## `.groups` argument.</code></pre>
-<pre class="r"><code>dag_accuracy &lt;- dat %&gt;%
+  mutate(CRT = sub(&quot;.*_(\\d+)$&quot;, &quot;\\1&quot;, CRT))
+
+dag_accuracy &lt;- dat %&gt;%
   mutate(CRT = sub(&quot;crt&quot;, &quot;&quot;, crt)) %&gt;%
   group_by(PROLIFIC_PID, group, CRT) %&gt;%
-  summarise(accuracy = mean(accuracy))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;PROLIFIC_PID&#39;, &#39;group&#39;. You can override
-## using the `.groups` argument.</code></pre>
-<pre class="r"><code>dag_fam &lt;- left_join(dag_fam, dag_accuracy, by=c(&quot;PROLIFIC_PID&quot;, &quot;group&quot;, &quot;CRT&quot;))
+  summarise(accuracy = mean(accuracy))
+
+dag_fam &lt;- left_join(dag_fam, dag_accuracy, by=c(&quot;PROLIFIC_PID&quot;, &quot;group&quot;, &quot;CRT&quot;))
 
 # plot
 dag_fam %&gt;%
@@ -3313,6 +3313,8 @@ dag_fam %&gt;%
 facets 1 to 6 indicate the different CRT problems
 </p>
 </div>
+<p>To analyze the differences in familiarity, we use an ordinal logistic
+model.</p>
 <pre class="r"><code># ordinal logistic model
 dag_fam$response &lt;- factor(dag_fam$familiarity)
 dag_fam$CRT &lt;- factor(dag_fam$CRT)
@@ -3499,6 +3501,8 @@ Observations
 </td>
 </tr>
 </table>
+<div id="familiarity-overall-counts-and-proportion-of-responses" class="section level3">
+<h3>Familiarity: overall counts and proportion of responses</h3>
 <pre class="r"><code># count the occurrences of each rating
 familiarity_counts &lt;- dag_fam %&gt;%
   group_by(familiarity) %&gt;%
@@ -3512,6 +3516,7 @@ total_ratings &lt;- sum(familiarity_counts$count)
 familiarity_counts &lt;- familiarity_counts %&gt;%
   mutate(percentage = sprintf(&quot;%.2f %s&quot;, (count / total_ratings) * 100, &quot; %&quot;))
 
+# display the table
 familiarity_counts %&gt;%
   knitr::kable(format = &quot;html&quot;, booktabs = TRUE, caption = &quot;Familiarity (counts summed across all CRT problems)&quot;)%&gt;%
   kable_styling(latex_options = c(&quot;scale_down&quot;,&quot;striped&quot;))</code></pre>
@@ -3568,19 +3573,20 @@ percentage
 </tr>
 </tbody>
 </table>
+</div>
 <div id="effects-of-familiarity-on-accuracy" class="section level2">
 <h2>Effects of familiarity on accuracy</h2>
-<p>Here we examined how accuracy changed with reported familiarity. Data
-provide clear evidence that accuracy is higher with greater
-familiarity.</p>
-<p>We tested also whether the effect of familiarity interacted with the
-effect of response justification, and there is some evidence for an
-interaction. Essentially, the effect of familiarity is larger than the
-effect of response justification, and the accuracy in CRT problems that
-are familiar to people is already high, such that it seems to attenuate
-the effect of asking for response justification. However, these results
-should be take with</p>
-<pre class="r"><code>dag_fam %&gt;%
+<p>We examined how accuracy changed with reported familiarity. Data
+provide evidence that accuracy is higher with greater familiarity.</p>
+<p>We also tested whether the effect of familiarity interacted with the
+effect of response justification. There is some evidence for an
+interaction, potentially due to a ceiling effect. Essentially, the
+effect of familiarity is larger than the effect of response
+justification, and the accuracy in CRT problems that are familiar to
+participants is already high, which seems to attenuate the effect of
+asking for response justification.</p>
+<pre class="r"><code># Compute accuracy split by familiarity
+dag_fam %&gt;%
   group_by(group,familiarity, CRT) %&gt;%
   summarise(
     accuracy = sprintf(&quot;%.2f (%.2f)&quot;, mean(accuracy, na.rm = TRUE), 
@@ -3593,8 +3599,6 @@ should be take with</p>
   ) %&gt;%
   knitr::kable(format = &quot;html&quot;, booktabs = TRUE, caption = &quot;Accuracy split by familiarity.&quot;)%&gt;%
   kable_styling(latex_options = c(&quot;scale_down&quot;,&quot;striped&quot;))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;group&#39;, &#39;familiarity&#39;. You can override
-## using the `.groups` argument.</code></pre>
 <table class="table" style="color: black; margin-left: auto; margin-right: auto;">
 <caption>
 Accuracy split by familiarity.
@@ -3927,7 +3931,7 @@ IJ
 </tr>
 </tbody>
 </table>
-<pre class="r"><code>#
+<pre class="r"><code># Compute overall accuracy split by familiarity
 dag_fam %&gt;%
   group_by(group,familiarity) %&gt;%
   summarise(
@@ -3941,8 +3945,6 @@ dag_fam %&gt;%
   ) %&gt;%
   knitr::kable(format = &quot;html&quot;, booktabs = TRUE, caption = &quot;Accuracy split by familiarity.&quot;)%&gt;%
   kable_styling(latex_options = c(&quot;scale_down&quot;,&quot;striped&quot;))</code></pre>
-<pre><code>## `summarise()` has grouped output by &#39;group&#39;. You can override using the
-## `.groups` argument.</code></pre>
 <table class="table" style="color: black; margin-left: auto; margin-right: auto;">
 <caption>
 Accuracy split by familiarity.
@@ -4008,7 +4010,8 @@ IJ
 </tr>
 </tbody>
 </table>
-<pre class="r"><code>dag_fam$familiarity &lt;- factor(dag_fam$familiarity)
+<pre class="r"><code># Fit logistic regression model
+dag_fam$familiarity &lt;- factor(dag_fam$familiarity)
 contrasts(dag_fam$familiarity) &lt;- contr.treatment(levels(dag_fam$familiarity), base=3) # this ensure main effect of conditions is tested at familiarity = 3
 m_fam &lt;- glmer(accuracy ~ group * familiarity + (1|PROLIFIC_PID) + (1|CRT), family=binomial(&quot;logit&quot;),data = dag_fam, control=glmerControl(optimizer=&quot;bobyqa&quot;))
 summary(m_fam)</code></pre>

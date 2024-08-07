@@ -1,5 +1,5 @@
 ---
-title: "Analysis manipulation check (response justification)"
+title: "Manipulation Pretest: analyses & results"
 author: "Matteo Lisi"
 date: "2024-05-20"
 output:
@@ -11,6 +11,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 library(kableExtra)
 ```
 
@@ -31,21 +32,23 @@ library(patchwork)
 
 ## Dataset
 
-Load dataset; note that the data in `manip_test_noOverlap_anonim.csv` have been already anonimized (`PROLIFIC_PID` has been replaced with an anonymous code) and do not contain the participants that also did the reading pre-test.
+Please note that the data in `manip_test_noOverlap_anonim.csv` have been already anonymised (`PROLIFIC_PID` has been replaced with an anonymous code) and do not contain the participants that also participated in the reading pre-test.
 
 ```{r, message=FALSE, warning=FALSE}
 d <- read_csv("./manip_test_noOverlap_anonim.csv")
 ```
 
+### Experimental conditions
+
 The three conditions in this experiment are the following
 
-- **CG** control groupd
-- **BJ** baseline (standard wording for response justification)
-- **IJ** 'improved' wording for response justification
+- **CG**: Control Group
+- **BJ**: Baseline Justification (standard wording for response justification)
+- **IJ**: Improved Justification (enhanced wording for response justification)
 
 ## Completion rates
 
-To compute the completion rates I have excluded previews, and determined the group (condition) based on the first click of the practice trial.
+To compute the completion rates, previews have been excluded. The group (condition) assignment was determined from the first click in the practice trial.
 
 ```{r}
 dropout_rates <- d %>%
@@ -71,7 +74,7 @@ print(dropout_rates)
 
 ## Exclusions
 
-First we compute a table with the breakdown of how many participants are excluded for each criteria.
+The following table provides a breakdown of the number of participants excluded based on each criterion.
 
 ```{r}
 total_initial <- nrow(d)
@@ -140,25 +143,21 @@ d <- d %>%
          Q_RecaptchaScore >= 0.5)
 ```
 
-Check if there are any duplicated response (the same Prolific ID with more than 1 response)
+Check for duplicated responses (same Prolific ID with more than one response):
 
 ```{r}
 n_pid <- tapply(d$PROLIFIC_PID, d$PROLIFIC_PID, length)
 length(n_pid[n_pid==2])
 ```
 
-These IDs have completed the survey twice
+These participants completed the survey twice:
 ```{r}
 duplicate_id <- names(n_pid[n_pid==2])
 duplicate_id
 ```
 
-<!-- I will remove them for this analysis -->
-<!-- ```{r} -->
-<!-- d <- d[!is.element(d$PROLIFIC_PID, duplicate_id),] -->
-<!-- ``` -->
 
-I will include only the first response (based on the response date and time) for each duplicate ID.
+To ensure data quality, only the first response (based on response date and time) for each duplicate ID will be included in the analysis:
 
 ```{r}
 # keep in only the first response for each duplicate
@@ -173,7 +172,7 @@ duplicates <- d %>%
 non_duplicates <- d %>%
   filter(!PROLIFIC_PID %in% duplicate_id)
 
-# put them ack together
+# put them back together
 d <- bind_rows(duplicates, non_duplicates)
 ```
 
@@ -200,9 +199,9 @@ knitr::kable(demographic_summary, format = "html", booktabs = TRUE, caption = "D
 ```
 
 
-## Put data in long format for analyses
+## Data Transformation
 
-For simplicity, I do this separately for each condition (CG, BJ and IJ) and then put them together.
+To prepare the data for analysis, we transform it into a long format. This is done separately for each condition (CG, BJ, and IJ) and then combined.
 
 ```{r}
 # CG
@@ -261,7 +260,9 @@ dag <- dat %>%
   
 # sanity check 
 all(dag$N==6)
-dag[is.element(dag$PROLIFIC_PID,sample(dag$PROLIFIC_PID,5)),] # 5 random IDs
+
+# display 5 random IDs
+dag[is.element(dag$PROLIFIC_PID,sample(dag$PROLIFIC_PID,5)),]
 ```
 
 ## Summary statistics
@@ -303,7 +304,7 @@ knitr::kable(stat_summary, format = "html", booktabs = TRUE, caption = "Summary 
 
 # Effect of response justification on accuracy
 
-Firstly, we recode the contrasts of condition (`group`) such that the control group is the baseline.
+First, we recode the contrasts of condition (`group`) such that the control group is the baseline.
 
 - `CG` control group
 - `BJ` response justification
@@ -315,7 +316,7 @@ contrasts(dag$group) <- contr.treatment(levels(dag$group), base=2)
 contrasts(dag$group)
 ```
 
-Next, I compare difference in accuracy between groups using a logistic regression. I have used a random effects model, with random intercepts by participants and item (similar results would be obtained with a simple logistic regression).
+Next, we compare the differences in accuracy between groups using logistic regression. A random effects model with random intercepts by participants and items is employed
 
 ```{r}
 dag_acc <- dat %>%
@@ -331,7 +332,7 @@ tab_model(m_logi, show.icc=FALSE, show.r2 = FALSE)
 
 ### Standardized effect sizes
 
-To the best of my knowledge, there is no universally accepted way to convert odds-ratio (as obtained from the logixtic regression) to Cohen's *d*. A common way to approximately map odds-ratios to *d* values is by scaling by the standard deviation of the logistic distribution $\pi \sqrt{3}$.
+The correspondence between Cohen's *d* and odds ratios can only be approximate. A common approach to mapping odds ratios to *d* values is by scaling by the standard deviation of the logistic distribution $\pi \sqrt{3}$.
 
 This gives the following:
 
@@ -339,7 +340,7 @@ This gives the following:
 (fixef(m_logi)[2:3] * sqrt(3)) / pi
 ```
 
-A more straightforward approach could be simply to apply Cohen's classical formula the difference in mean accuracy and divide by the pooled standard deviations. This gives the following estimates, which numerically are very close to the previous ones.
+Perhaps a more straightforward approach could be simply to apply Cohen's classical formula for the difference in mean accuracy and divide by the pooled standard deviations. This provides the following estimates, which are numerically very close to the previous ones.
 
 ```{r}
 pooled_sd <- function(x, y) {
@@ -362,7 +363,7 @@ CG <- dag$accuracy[dag$group=="CG"]
 
 ## Does the improved wording make a difference?
 
-TO directly test the difference between `BJ` and `IJ` conditions we can swap the dummy coding. Numerically accuracy is slightly higher in `IJ`, but the below analysis indicate that the difference is not statistically significant.
+To directly test the difference between the `BJ` and `IJ` conditions, we can swap the dummy coding. Although numerically the accuracy is slightly higher in the `IJ` condition, the analysis below indicates that the difference is not statistically significant.
 
 ```{r}
 contrasts(dag_acc$group) <- contr.treatment(levels(dag_acc$group), base=1)
@@ -404,7 +405,7 @@ pl1 + pl2
 
 # Length of response justification
 
-Here I look at what people types in the response justification (both in terms of raw number of characters and number of words)
+This section examines the content of the response justifications in terms of the raw number of characters and the number of words.
 
 ```{r}
 dat %>%
@@ -422,7 +423,7 @@ dat %>%
   kable_styling(latex_options = c("scale_down","striped"))
 ```
 
-To compare these statistically, I use a simple t-test. The results indicates that people tended to write a bit more in the 'improved' `IJ` condition.
+To compare these statistically, we use a simple t-test. The results indicate that participants tended to write slightly more in the 'improved' `IJ` condition.
 
 ```{r}
 dat_length <- dat %>%
@@ -446,7 +447,7 @@ t.test(dat_length$average_word_count[dat_length$group=="BJ"],
 
 # Time spent
 
-Here we compare the log-transformed response times
+In this section, we compare the log-transformed response times across the different conditions.
 
 ```{r, fig.align='center', fig.height=4, fig.width=6}
 dag_RT <- dat %>%
@@ -473,7 +474,7 @@ dag_RT %>%
   labs(x="response time")
 ```
 
-Both `IJ` and `BJ` have longer response times than baseline, and numerically the response time is slightly longer in `IJ` than in in `BJ` (see also t-test below).
+Both `IJ` and `BJ` conditions exhibit longer response times compared to the control group (`CG`). Numerically, the response time is slightly longer in the `IJ` condition compared to the `BJ` condition, as evidenced by the t-test below.
 
 ```{r}
 t.test(log_RT ~ group, dag_RT[dag_RT$group!='CG',])
@@ -482,7 +483,7 @@ t.test(log_RT ~ group, dag_RT[dag_RT$group!='CG',])
 
 # Perceived effort
 
-There seems to be no difference in the perceived, self-reported effort among all conditions. I test this formally using an ordinal logistic model.
+There appears to be no difference in the perceived, self-reported effort among the conditions. This is tested formally using an ordinal logistic model.
 
 ```{r, fig.align='center', fig.height=4, fig.width=6}
 dag_effort <- dat %>%
@@ -516,7 +517,7 @@ tab_model(m_eff, show.r2 = FALSE)
 
 # Beliefs about reviewing justification
 
-The question here was: *How carefully do you believe the explanations of your answers to the reasoning problems will be reviewed by the research team?*
+The question posed to participants was: *How carefully do you believe the explanations of your answers to the reasoning problems will be reviewed by the research team?*
 
 Participants could choose one of the following options:
 
@@ -527,7 +528,7 @@ Participants could choose one of the following options:
 5. Carefully reviewed
 6. Extremely carefully reviewed
 
-Here we see that most people report that they believe the justification will be reviewed, and this belief seems slightly stronger in the `IJ` condition
+Most participants reported that they believed their justifications would be reviewed. This belief appears to be slightly stronger in the `IJ` condition.
 
 ```{r, fig.align='center', fig.height=4, fig.width=6}
 # check review
@@ -550,6 +551,11 @@ dag_review %>%
   scale_x_continuous(breaks=seq(1:6))+
   labs(x="response")
 
+```
+
+To statistically test this difference, we use an ordinal logistic regression model.
+
+```{r}
 # ordinal model
 dag_review$response <- factor(dag_review$check_review)
 m_review <- clm(response ~ group, data = dag_review)
@@ -560,7 +566,7 @@ tab_model(m_review, show.r2 = FALSE)
 
 # Use of external resources
 
-Her we compute first a table indicating the count and fraction of participants reporting use of external resources for each CRT item.
+First, we compute a table indicating the count and fraction of participants reporting the use of external resources for each CRT item.
 
 ```{r}
 # ext_resources
@@ -602,6 +608,12 @@ dag_resources %>%
   knitr::kable(format = "html", booktabs = TRUE, caption = "Proportion and number of people reporting use of external resources for each CRT item.")%>%
   kable_styling(latex_options = c("scale_down","striped"))
 
+```
+
+
+There appears to be no significant differences in the use of external resources among the groups. This was formally tested using a multilevel logistic regression.
+
+```{r}
 # logistic regression
 dag_resources$response <- dag_resources$ext_resources -1
 m_res <- glmer(response ~ group + (1|PROLIFIC_PID) + (1|CRT), family=binomial("logit"),data = dag_resources)
@@ -611,10 +623,11 @@ tab_model(m_res, show.r2 = FALSE, show.icc = FALSE)
 
 ## Effects of reported use of external resources on accuracy.
 
-Here we compute the accuracy split by whether people reported to use external resources or not. I also run a logistic model that indicates a clear effect of use of external resources on accuracy, but there does not seem to be an interaction (i.e. it does not seem to be the case that people used external resources more carefully/attentively when a response justification was required).
+We compute the accuracy split by whether participants reported using external resources or not. A logistic model indicates a clear effect of external resource use on accuracy. However, there does not seem to be an interaction effect, suggesting that the presence of response justification does not significantly influence the carefulness or attentiveness with which participants use external resources.
 
 
 ```{r}
+# Compute accuracy by external resource use
 dag_resources %>%
   group_by(CRT, group,used_external) %>%
   summarise(
@@ -629,6 +642,7 @@ dag_resources %>%
   knitr::kable(format = "html", booktabs = TRUE, caption = "Effects of reported use of external resources on accuracy, compute separately for each CRT item. Accuracy here is reported as mean (std.) across participants.")%>%
   kable_styling(latex_options = c("scale_down","striped"))
 
+# Compute overall accuracy by external resource use
 dag_resources %>%
   group_by(PROLIFIC_PID, group,used_external) %>%
   summarise(accuracy = mean(accuracy)) %>%
@@ -645,7 +659,7 @@ dag_resources %>%
   knitr::kable(format = "html", booktabs = TRUE, caption = "Effects of reported use of external resources on accuracy, compute separately for each CRT item. Accuracy here is reported as mean (std.) across participants.")%>%
   kable_styling(latex_options = c("scale_down","striped"))
 
-
+# Fit logistic regression model
 m_accres <- glmer(accuracy ~ group * used_external + (1|PROLIFIC_PID) + (1|CRT), family=binomial("logit"),data = dag_resources)
 summary(m_accres)
 tab_model(m_accres, show.r2 = FALSE, show.icc = FALSE)
@@ -654,12 +668,12 @@ tab_model(m_accres, show.r2 = FALSE, show.icc = FALSE)
 
 # Familiarity
 
-The question was: *Have you ever encountered any of the reasoning problems listed below before participating in our study?*
+The question posed to participants was: *Have you ever encountered any of the reasoning problems listed below before participating in our study?*
 
 Response options:
 
 1. yes, I did encounter the same problem before
-2. yes, I did encounter the same problem before
+2. yes, I did  encounter a very similar problem before
 3. no, I have not encountered it before
 
 ```{r, fig.align='center', fig.height=4, fig.width=6, fig.cap="facets 1 to 6 indicate the different CRT problems"}
@@ -694,7 +708,11 @@ dag_fam %>%
   theme_minimal()+
   scale_x_continuous(breaks=seq(1:3))+
   labs(x="response")
+```
 
+To analyze the differences in familiarity, we use an ordinal logistic model.
+
+```{r}
 # ordinal logistic model
 dag_fam$response <- factor(dag_fam$familiarity)
 dag_fam$CRT <- factor(dag_fam$CRT)
@@ -703,6 +721,8 @@ summary(m_fam)
 tab_model(m_fam, show.r2 = FALSE)
 ```
 
+
+### Familiarity: overall counts and proportion of responses
 
 ```{r}
 # count the occurrences of each rating
@@ -718,6 +738,7 @@ total_ratings <- sum(familiarity_counts$count)
 familiarity_counts <- familiarity_counts %>%
   mutate(percentage = sprintf("%.2f %s", (count / total_ratings) * 100, " %"))
 
+# display the table
 familiarity_counts %>%
   knitr::kable(format = "html", booktabs = TRUE, caption = "Familiarity (counts summed across all CRT problems)")%>%
   kable_styling(latex_options = c("scale_down","striped"))
@@ -726,11 +747,12 @@ familiarity_counts %>%
 
 ## Effects of familiarity on accuracy
 
-Here we examined how accuracy changed with reported familiarity. Data provide clear evidence that accuracy is higher with greater familiarity. 
+We examined how accuracy changed with reported familiarity. Data provide evidence that accuracy is higher with greater familiarity.
 
-We tested also whether the effect of familiarity interacted with the effect of response justification, and there is some evidence for an interaction. Essentially, the effect of familiarity is larger than the effect of response justification, and the accuracy in CRT problems that are familiar to people is already high, such that it seems to attenuate the effect of asking for response justification. However, these results should be take with 
+We also tested whether the effect of familiarity interacted with the effect of response justification. There is some evidence for an interaction, potentially due to a ceiling effect. Essentially, the effect of familiarity is larger than the effect of response justification, and the accuracy in CRT problems that are familiar to participants is already high, which seems to attenuate the effect of asking for response justification.
 
 ```{r}
+# Compute accuracy split by familiarity
 dag_fam %>%
   group_by(group,familiarity, CRT) %>%
   summarise(
@@ -745,7 +767,7 @@ dag_fam %>%
   knitr::kable(format = "html", booktabs = TRUE, caption = "Accuracy split by familiarity.")%>%
   kable_styling(latex_options = c("scale_down","striped"))
 
-#
+# Compute overall accuracy split by familiarity
 dag_fam %>%
   group_by(group,familiarity) %>%
   summarise(
@@ -760,6 +782,7 @@ dag_fam %>%
   knitr::kable(format = "html", booktabs = TRUE, caption = "Accuracy split by familiarity.")%>%
   kable_styling(latex_options = c("scale_down","striped"))
 
+# Fit logistic regression model
 dag_fam$familiarity <- factor(dag_fam$familiarity)
 contrasts(dag_fam$familiarity) <- contr.treatment(levels(dag_fam$familiarity), base=3) # this ensure main effect of conditions is tested at familiarity = 3
 m_fam <- glmer(accuracy ~ group * familiarity + (1|PROLIFIC_PID) + (1|CRT), family=binomial("logit"),data = dag_fam, control=glmerControl(optimizer="bobyqa"))

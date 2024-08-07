@@ -1,6 +1,6 @@
 ---
 title: "Power Analyses"
-author: "Erin Buchanan, Matteo Lisi"
+author: "Matteo Lisi, Erin Buchanan"
 date: "`r Sys.Date()`"
 output: 
   html_document:
@@ -10,6 +10,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
 
 ## Libraries
