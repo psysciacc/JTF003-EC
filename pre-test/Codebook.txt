@@ -1,0 +1,15 @@
+
+------------------------------------------------------------------------------
+Codebook for Reading Times Pretest (Pretest2.csv)
+Form: Variable name / Variable label / Variable values 
+------------------------------------------------------------------------------
+Id/ Identification Number/ NA	
+Age/ "What is your age?"/ NA
+Gen/ "What is your gender?"/ 1 = "male", 2 = "female", 3 = "other"
+Edu/ "Which of the following best describes your highest achieved education level?"/1 = "Less than High School", 2 = "Finished High School", 3 = "Undergraduate Degree", 4 = "Masters Degree", 5 = "Doctoral (PhD) or Professional (JD, MD) Degree" 
+Job/ "What is your occupation?"/ 1 = "Management, professional, and related", 2 = "Service", 3 = "Sales and office", 4 = "Farming, fishing, and forestry", 5 = "Construction, extraction, and maintenance", 6 = "Production, transportation, and material moving", 7 = "Government", 8 = "Retired", 9 = "Unemployed", 10 = "students", 11 = "other"
+Man/ Manipulation of effort/0 = "low cost, low utility", 1 = "high cost, low utility", 2 = "high cost and high utility"
+Duration/ The time taken to complete the whole questionnaire (in seconds) / NA
+CRT1_t TO CRT6_t/The time taken to read the cognitive reflection problem (problems 1 to 6; in seconds)/ NA  
+CRT1_a TO CRT6_a/Answers to the cognitive reflection problem (problems 1 to 6)/ 1 = "Option A", 2 = "Option B", 3 = "Option C", 4 = "Option D"
+CRT1_ch TO CRT6_ch/Reading checks of the cognitive reflection problem (problems 1 to 6)/ 1 = "Option A", 2 = "Option B", 3 = "Option C", 4 = "Option D"
