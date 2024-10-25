@@ -135,6 +135,7 @@ kable(summary_table, format = "html", booktabs = TRUE,
 
 
 Remove participants who failed at least one of the above criteria.
+
 ```{r}
 d <- d %>% 
   filter(Consent == 1, 
@@ -152,11 +153,11 @@ length(n_pid[n_pid==2])
 ```
 
 These participants completed the survey twice:
+
 ```{r}
 duplicate_id <- names(n_pid[n_pid==2])
 duplicate_id
 ```
-
 
 To ensure data quality, only the first response (based on response date and time) for each duplicate ID will be included in the analysis:
 

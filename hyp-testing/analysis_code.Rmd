@@ -1,6 +1,6 @@
 ---
 title: "Planned Analysis Code"
-author: "Erin Buchanan"
+author: "Matteo Lisi, Erin Buchanan"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -9,132 +9,726 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-1) what parameters should we use for the command arguments
+## Libraries
 
-Hi Erin and Stephens!
- 
-It's great to connect with you in this way, and thanks in advance for you help.
- 
-You should have already the link to the OSF (https://osf.io/srj49/) which contains the script for the power analyses. All other information like hypotheses etc. is in the manuscript (https://docs.google.com/document/d/1rbhVhVPe2RR-vLZ2w1TacpAc0AY47ni0/edit).  Please keep in mind that the power analyses will need to be slightly modified and re-run, since we will be now splitting countries in 2 groups instead of 3; I will also need to update the effect sizes as mentioned in the meeting. 
-In any case, it would be good to have another pair of eyes checking the code and the logic behind it, so please do have a look at it and let me know if you have suggestions; I summarize below key aspects of the simulations, highlighting some of the choices I have made, and it would be great to hear from you if these makes sense to you.
- 
-The task involves cognitive reflection tests (CRT), presented twice to participants, in two distinct phases, so that they have the opportunity to correct their intuitive errors in the second, more 'deliberative' phase. As such, the main dependent variable is the fraction of errors corrected, and therefore the analysis is essentially a multilevel logistic regression. Note that the dependent variable is slightly different for hypotheses H1 vs. H2 and H3, corresponding to two slightly different conditional probabilities:
-for H1, it is the fraction of correct responses made in phase 2 out of all correct responses;
-for H2 and H3 is the fraction of errors, made in phase 1, that were corrected in phase 2.
-I hope these make sense! 
- 
-One complexity in simulating data for this study is that the number of observations effectively depends on the number of errors that participants make (e.g., if a participant answered correctly all problems in phase 1, it would not contribute anything to the tests of hypotheses H2 and H3). To take this into account in the simulation I have estimated probability of making an error in phase 1, and of correcting in phase 2, based on previous studies by Miro (e.g. this one:  https://doi.org/10.1037/xge0001375) I have also estimated how these probabilities vary across participants, and obtained some plausible values for mean and SD, which are listed at the top of the script, under "parameter settings"; note that these are expressed in log-odds units. These values correspond to a pretty broad range of error rates, and relatively low rates of correcting the errors, matching prior results; in the manuscript I wrote : "in our simulation, we assumed that for the first stage, 95% of participants would have an error rate between 0.3 and 1. In the second stage, we assumed that 95% of participants would have a fraction of corrected errors ranging from 0 to 0.33."  (you can get these values by simulating individual participants' and their errors). If you look at the script you can see that the code to simulate the data is wrapped in the gen_data()​ function. 
- 
-Lower down in the script there is also a function called test_hypotheses()​which does the actual model fitting and testing of hypotheses - this should be more straightforward but let me know if you have questions. 
- 
-Some thoughts & questions: 
+```{r}
+library(dplyr)
+library(lme4)
+library(kableExtra)
+library(tidyr)
+library(stringr)
+```
 
-do the approach for taking heterogeneity in error rates sounds sensible to you? 
-at the moment the models have only random intercept by country. They don't include random slopes just because it slowed down simulations quite a lot, and initially I did not have access to a computing cluster. At the moment I just mentioned in the manuscript that will test a model with random slopes by-country as robustness check but am planning to switch to this for the main confirmatory analysis - let me know if you this sounds good with you.
-I did not include by-participants random intercepts; I found that this quite systematically produces numerical issues and convergence warnings, at least when running the model using lme4 package in R (there are only 6 CRT problems, so we only have at most 6 "bernoulli" observations per participants, and for many participants will be only 1 or 2, so it's hard to estimate by-participants random effects reliably). Please do let me know if this sounds OK to you. Probably the best way to take this into account would be to use a Bayesian multilevel model, estimated with MCMC sampling, but would make the power analyses a lot slower, so I have been avoiding this so far. 
- 
-It would be great to have your feedback on the design table, as I have never really made one of these before. You can find this in the manuscript, but just in case I paste it below as well.
- 
- 
- 
-I think that's all that comes to mind for the moment!
- 
-All the best,
-Matteo
- 
- 
- 
-Question
+## Data
 
-Hypothesis
+```{r}
+d <- read.csv("../manipulation-check/manip_test_noOverlap_anonim.csv")
+```
 
-Sampling plan (e.g. power analysis)
+## Exclusions
 
-Analysis Plan
+The following table provides a breakdown of the number of participants excluded based on each criterion.
 
-Interpretation given to different outcomes
+```{r}
+total_initial <- nrow(d)
 
-Question 1A
+# Status == 0
+excluded_status <- total_initial - nrow(d %>% filter(Status == 0))
+remaining_after_status <- nrow(d %>% filter(Status == 0))
+
+
+# Finished == 1
+excluded_finished <- remaining_after_status - nrow(d %>% filter(Status == 0, 
+                                                                Finished == 1))
+#excluded_finished <- total_initial - nrow(d %>% filter(Finished == 1))
+remaining_after_finished <- nrow(d %>% filter(Status == 0, 
+                                              Finished == 1))
+
+# Q_RecaptchaScore > 0.5
+excluded_recaptcha <- remaining_after_finished - nrow(d %>% filter(Status == 0, 
+                                                                   Finished == 1, 
+                                                                   Progress >= 99, 
+                                                                   Q_RecaptchaScore >= 0.5))
+remaining_after_recaptcha <- nrow(d %>% filter(Status == 0, 
+                                               Finished == 1, 
+                                               Progress >= 99, 
+                                               Q_RecaptchaScore >= 0.5))
+
+# Total number of participants excluded (excluded because they fail at least 1 criterion)
+total_excluded <- total_initial - remaining_after_recaptcha
+
+# Create summary table
+summary_table <- data.frame(
+  Criterion = c( "Status == 0",
+                 "Finished == 1", 
+                 "Q_RecaptchaScore >= 0.5", 
+                 "Total"),
+  Excluded = c(excluded_status, 
+               excluded_finished, 
+               excluded_recaptcha, 
+               total_excluded),
+  Fraction = c(excluded_status/total_initial, 
+               excluded_finished/total_initial, 
+               excluded_recaptcha/total_initial, 
+               total_excluded/total_initial),
+  
+  Percentage = c(excluded_status/total_initial * 100, 
+               excluded_finished/total_initial * 100, 
+               excluded_recaptcha/total_initial * 100, 
+               total_excluded/total_initial * 100)
+)
+
+# Print the summary table as an HTML table
+kable(summary_table, format = "html", booktabs = TRUE, 
+      col.names = c("Exclusion Criterion", "Number Excluded", "Fraction Excluded", "Percentage Excluded"), 
+      caption="Each line indicate how many participants failed each criterion. Exclusion criteria are applied sequentially in order; the last line indicate how many participants failed at least one criterion in total.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+Remove participants who failed at least one of the above criteria.
+
+```{r}
+d <- d %>% 
+  filter(Consent == 1, 
+         Progress >= 99, 
+         Finished == 1, 
+         Status == 0, 
+         Q_RecaptchaScore >= 0.5)
+```
+
+Check for duplicated responses (same Prolific ID with more than one response):
+
+```{r}
+n_pid <- tapply(d$PROLIFIC_PID, d$PROLIFIC_PID, length)
+length(n_pid[n_pid==2])
+```
+
+These participants completed the survey twice:
+
+```{r}
+duplicate_id <- names(n_pid[n_pid==2])
+duplicate_id
+```
+
+To ensure data quality, only the first response (based on response date and time) for each duplicate ID will be included in the analysis:
+
+```{r}
+# keep in only the first response for each duplicate
+duplicates <- d %>%
+  filter(PROLIFIC_PID %in% duplicate_id) %>%
+  arrange(PROLIFIC_PID, StartDate, EndDate) %>%
+  group_by(PROLIFIC_PID) %>%
+  dplyr::slice(1) %>% # slice operate on each group for grouped df
+  ungroup()
+
+# non-duplicate responses
+non_duplicates <- d %>%
+  filter(!PROLIFIC_PID %in% duplicate_id)
+
+# put them back together
+d <- bind_rows(duplicates, non_duplicates)
+```
+
+## Demographics information of participants
+
+```{r}
+demographic_summary <- d %>%
+  summarise(
+    `Avearge age (Std.)` = sprintf("%.2f (%.2f)", mean(Age, na.rm = TRUE), sd(Age, na.rm = TRUE)),
+    `Age Range` = paste(min(Age, na.rm = TRUE), "to", max(Age, na.rm = TRUE)),
+    `N. males` = sprintf("%i", sum(Sex == 0, na.rm = TRUE)),
+    `N. female` = sprintf("%i", sum(Sex == 1, na.rm = TRUE))
+  ) %>%
+  pivot_longer(everything(), names_to = "Demographic", values_to = "Value") 
+
+knitr::kable(demographic_summary, format = "html", booktabs = TRUE, caption = "Demographic Information of Participants", col.names = c("Demographic", "Value"))%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+## Data Transformation
+
+To prepare the data for analysis, we transform it into a long format. This is done separately for each condition (CG, BJ, and IJ) and then combined.
+
+```{r}
+# CG
+crt_CG <- d %>% select(PROLIFIC_PID, matches("^crt[0-9]+_CG"))
+crt_CG <- crt_CG %>%
+  pivot_longer(
+    cols = -PROLIFIC_PID,
+    names_to = c("crt", ".value"),
+    names_pattern = "(crt\\d+)_CG_(.*)") 
+crt_CG$group <- "CG"
+crt_CG$explain <- NA
+
+# BJ
+crt_BJ <- d %>% select(PROLIFIC_PID, matches("^crt[0-9]+_BJ"))
+crt_BJ <- crt_BJ %>%
+  pivot_longer(
+    cols = -PROLIFIC_PID,
+    names_to = c("crt", ".value"),
+    names_pattern = "(crt\\d+)_BJ_(.*)") 
+crt_BJ$group <- "BJ"
+
+# IJ
+crt_IJ <- d %>% select(PROLIFIC_PID, matches("^crt[0-9]+_IJ"))
+crt_IJ <- crt_IJ %>%
+  pivot_longer(
+    cols = -PROLIFIC_PID,
+    names_to = c("crt", ".value"),
+    names_pattern = "(crt\\d+)_IJ_(.*)") 
+crt_IJ$group <- "IJ"
+
+# put together
+other_info <- d %>% select(PROLIFIC_PID, !matches("^crt[0-9]")) %>%
+  select(PROLIFIC_PID, !starts_with("practice"))
+crt_all <- rbind(crt_CG, crt_BJ, crt_IJ)
+dat <- left_join(crt_all, other_info, by = "PROLIFIC_PID") %>%
+  filter(!is.na(task))
+
+# recode response accuracy as binary 0/1
+dat$accuracy <- ifelse(!is.na(dat$task), 
+                       ifelse(dat$task==1,1,0),
+                       dat$task)
+
+# contrast coding for condition label
+dat$group <- factor(dat$group)
+contrasts(dat$group) <- contr.treatment(levels(dat$group), base=2)
+
+# make a smaller dataset for analysis, with counts of 
+# correct and errors for each participant
+dag <- dat %>%
+  group_by(PROLIFIC_PID, group) %>%
+  summarise(correct = sum(accuracy, na.rm=T),
+            N = n(),
+            accuracy=mean(accuracy, na.rm=T)) %>%
+  mutate(errors = N-correct) %>%
+  filter(!is.nan(accuracy))
+  
+# sanity check 
+all(dag$N==6)
+
+# display 5 random IDs
+dag[is.element(dag$PROLIFIC_PID,sample(dag$PROLIFIC_PID,5)),]
+```
+
+## Summary statistics
+
+```{r}
+stat_summary <- dat %>%
+  group_by(PROLIFIC_PID, group) %>%
+  summarise(accuracy = mean(accuracy, na.rm = TRUE),
+            # may have trouble with this line if it imports with . or space
+            RT = mean(`task_rt_Page.Submit`, na.rm = TRUE)) %>%
+  group_by(group)%>%
+  summarise(
+    Accuracy = sprintf("%.2f (%.2f)", mean(accuracy, na.rm = TRUE), sd(accuracy, na.rm = TRUE)),
+    `Response time` = sprintf("%.2f (%.2f)", mean(RT, na.rm = TRUE), sd(RT, na.rm = TRUE))
+  )  
+
+knitr::kable(stat_summary, format = "html", booktabs = TRUE, caption = "Summary statistics (accuracy and response time); values reported as mean (Std.) across participants.") %>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+## Summary statistics by CRT problem
+
+```{r}
+stat_summary <- dat %>%
+  group_by(crt, group) %>%
+  summarise(
+    Accuracy = sprintf("%.2f (%.2f)", mean(accuracy, na.rm = TRUE), sd(accuracy, na.rm = TRUE)),
+    RT = sprintf("%.2f (%.2f)", mean(`task_rt_Page.Submit`, na.rm = TRUE), sd(`task_rt_Page.Submit`, na.rm = TRUE))
+  )  %>%
+  pivot_wider(
+    names_from = group, 
+    values_from = c(Accuracy, RT),
+    names_sep = " "
+  )
+
+knitr::kable(stat_summary, format = "html", booktabs = TRUE, caption = "Summary statistics of accuracy and response time for individual CRT problems")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+The above is an example structure and reorganization of the dataset, along with exclusions. Given this pilot was simply to test the study manipulations, the data does not include country or the second round of correction necessary to demonstrate hypothesis code. Therefore, we generate example data:
+
+```{r}
+# these are plausible parameter values based on Sirota 2023 and similar 
+# article in the literature
+
+# p(error @ stage 1)
+err_mu <- 1.22
+err_sd <- 0.92
+
+# p(correct @ stage 2 | error @ stage 1) 
+corr_mu <- -2.53 
+corr_sd <- 1.12
+
+# set effect sizes ----
+
+# Set effect values in standardized as Cohen's d and rescale 
+# to an approximately similar value for the logistic distribution. 
+# Specifically, we multiply the d values by the ratio of the standard deviation
+# of the logistic distribution to that of the standard normal distribution, 
+# which is (pi/sqrt(3)).
+d_fdbk <- 0.19 * (pi/sqrt(3)) # feedback minus baseline
+d_just <- 0.19 * (pi/sqrt(3)) # justification minus baseline
+d_both <- (d_fdbk + d_just) # (feedback + justification) minus baseline 
+# Note: we expect the effects of feedback to be additive
+
+# vector of fixed-effects coefficients
+beta_lo_p <- c(corr_mu, NA, NA, NA)
+beta_lo_p[2] <- d_fdbk
+beta_lo_p[3] <- d_just
+beta_lo_p[4] <- d_both
+
+# determine the country-level random effect SD
+# half the group-level effect size, so that ~95% of countries have 
+# population-level effects of the same sign
+rfx_sd_country <- (0.19 * (pi/sqrt(3))) / 2 
+
+# power simulation parameters ----
+n_trial <- 6
+
+generate_labels <- function(N_c, wratio = 0.5) {
+ n_weird <- round(wratio * N_c)
+ n_nonweird <- N_c - n_weird
+ labels <- c(
+ rep("weird", n_weird), 
+ rep("non-weird", n_nonweird)
+ )[sample(N_c)]
+ return(labels)
+}
+
+gen_data <- function(N, N_c, wratio){
+ 
+ N_tot <- N * N_c * 4 # 4 is the number of between subjects conditions
+ 
+ ## simulate dataset
+ # simulate error propensity of individual participants in phase 1
+ # simulate number of errors in phase 1
+ # number of errors (log(errors))
+ error_lo <- rnorm(N_tot, mean = err_mu, sd = err_sd)
+ 
+ # simulate random effects and between-individual variability 
+ # (to introduce heterogeneity and make simulations more realistic)
+ rfx_id <- rnorm(N_tot, mean = 0, sd = corr_sd)
+ 
+ # sample countries
+ rfx_country <- rnorm(N_c, mean = 0, sd = rfx_sd_country)
+ group_country <- generate_labels(N_c, wratio) 
+ 
+ # create dataset frame
+ dat <- expand_grid(country = 1:N_c, 
+   condition = 1:4, 
+   id = 1:N, 
+   trial = 1:6) %>%
+ mutate(id = str_c(id, country, condition, sep = "_"))
+ dat$country_group <- group_country[dat$country]
+ 
+ # simulate responses
+ dat$corrected <- NA
+ dat$error <- NA
+ dat$id <- as.integer(factor(dat$id, labels = 1:length(unique(dat$id))))
+ dat$lo <- NA
+ dat$error_lo <- error_lo[dat$id]
+ dat$rfx_country <- rfx_country[dat$country]
+ dat$rfx_id <- rfx_id[dat$id]
+ 
+ # set log-odds of p(correction) for each datapoint
+ dat <- dat %>%
+ # control group, baseline who don't get anything (beta_lo_p[1])
+ # intercept (control group mean because X1 is the group they are in)
+ # intercept beta_lo_p[1] + group*0 + country random + person random effect
+ mutate(lo = beta_lo_p[1] + rfx_country + rfx_id) %>%
+ mutate(lo = case_when(
+ # when group 1 baseline keep the original estimation from the line above 
+ condition == 1 ~ lo, 
+ # when group is not baseline (feedback, justification, both) then add in the effect of those other conditions 
+ condition == 2 ~ lo + beta_lo_p[2], 
+ condition == 3 ~ lo + beta_lo_p[3], 
+ condition == 4 ~ lo + beta_lo_p[4]
+ ))
+ 
+ # simulate number of errors likely for participants
+ dat$error <- rbinom(nrow(dat), 
+   size = 1, 
+   p = exp(dat$error_lo)/(1 + exp(dat$error_lo)))
+ 
+ # simulate number of errors that are corrected in phase 2
+ dat$corrected <- ifelse(dat$error == 1, 
+    rbinom(nrow(dat), 
+     size = 1, 
+     p = exp(dat$lo)/(1 + exp(dat$lo))), 
+    0)
+ 
+ # total correct responses given the simulated data
+ dat$correct <- 1-dat$error + dat$corrected
+ 
+ # keep only trials with errors in phase 1
+ dat <- dat %>%
+ # filter(error == 1) %>%
+ mutate(c_F = ifelse(condition == 2, 1, 0), 
+  c_FR = ifelse(condition == 3, 1, 0)) %>%
+ mutate(feedback = ifelse(condition == 2 | condition == 4, 1, 0), 
+  justification = ifelse(condition == 3 | condition == 4, 1, 0), 
+  condition = case_when(
+  condition == 1 ~ "baseline", 
+  condition == 2 ~ "feedback", 
+  condition == 3 ~ "justification", 
+  condition == 4 ~ "feedback + justification"
+  ))
+ 
+ dat$country_group <- factor(dat$country_group)
+ 
+ # Set attributes
+ attr(dat, "N") <- N
+ attr(dat, "N_c") <- N_c
+ 
+ # return simulated data
+ return(dat)
+}
+
+dat <- gen_data(N = (13000/30), N_c = 30, wratio = .3)
+
+dat_H1 <- dat %>%
+ filter(correct == 1)
+
+dat_Hother <- dat %>%
+ filter(error == 1)
+```
+
+```{r}
+## TEST HYPOTHESES
+
+alpha <- 0.05
+# note: the tests on separate country_groups are independent one another 
+# (different countries, participants, labs, etc.), so the expected 
+# false positive rate of the composite test, run on the 2 country_group 
+# separately and using the conventional alpha = 0.05 for each test, 
+# would be 0.05^2 = 0.0025 (the hypothesis supported if and only if 
+# all 2 independent tests are significant). We don't also apply correction 
+# for multiple comparisons otherwise it would become too conservative.
+```
+
+## Question 1A
 
 Do people tend to correct their intuitive errors during deliberation?
 
-Hypothesis 1A
+### Hypothesis 1A 
 
-We hypothesise that we people will provide only a relatively small proportion (i.e., below 50%) of correct responses during deliberation.
+First, we hypothesize participants in the control condition who provide correct answers in the deliberative phase will primarily do so already in the initial intuitive phase; specifically, we predict that less than half of correct answers will arise from error correction during deliberation.
 
-Aiming for at least 95% power, we plan to recruit over 12,600 participants across cultural clusters, accounting for a 5% attrition rate. This is based on simulations informed by previous literature, assuming small effect sizes (Cohen's d ≥ 0.2) for our manipulations.
+(The dependent variable is the number of correct responses during deliberation (phase 2), relative to the total number of correctly answered items in both phases.)
 
-We will use a logistic multilevel model to test if the baseline condition sees less than 50% of intuitive errors corrected in phase 2, using a one-tailed Wald test on the intercept (which corresponds to expected proportion of corrected responses in log-odds)
+In set notation, this would be |C2\C1||C1 ∪ C2| , where C1 and C2 are the items correctly answered in phase 1 and 2, respectively.
 
-Intercept < 0: Hypothesis supported; low correction rate.
+### Power
 
-Intercept ≥ 0: Hypothesis not supported; higher correction rate.
+We plan to recruit at least 13,000 participants in total. This is based on simulations informed by previous literature, assuming small effect sizes (Cohen’s d ≥ 0.19) for our manipulations, and taking into account up to 30% attrition rate and imbalance in the number of participants per category up to a 70/30 split. This sample size should provide at least 95% power to test all hypotheses.
 
-Question 1B
+### Analysis
 
-Do people across different cultures tend to correct their intuitive errors during deliberation?
+We will use a logistic multilevel model to test if the proportion of correct responses made in phase 2 out of all correct responses given in phase 1 and 2 is less than 50% in the baseline condition, using a one-tailed Wald test on the intercept (which corresponds to expected proportion of correct responses in log-odds). This model will be fit on data from all cultural categories taken together.
 
-Hypothesis 1B
+### Interpretation
 
-We expect that people will provide only a relatively small proportion of correct responses (i.e., below 50%) during deliberation in all diverse cultural contexts included in our study.
+Intercept < 0: Hypothesis supported; lower than 50% correct rate.
 
-Repeat the logistic multilevel model analysis for each cluster independently to assess the correction of intuitive errors. 
+Intercept ≥ 0: Hypothesis not supported; higher than 50% correct rate.
 
-Intercept < 0 in all clusters: Hypothesis supported; low correction rate universally across cultures.
+```{r}
+# now fit models for H1 specifically: note that here the dependent
+# variable is different as the hypothesis is about the proportion of
+# correct response (out of all correct responses) that are corrected
+# in phase 2 ('data' arguments is set to 'dat_H1' instead of just 'dat')
+#
+mH1_all <- glmer(
+        corrected ~ feedback * justification +
+                (feedback * justification || country),
+        family = binomial("logit"),
+        data = dat_H1,
+        control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+)
 
-Intercept ≥ 0 in one or more clusters: Hypothesis not supported; suggests cultural variation in the propensity for error correction.
+# H1
+# # p_correction < 0.5
 
-Question 2A
+# One-tailed test for H1a
+# Testing if the intercept is significantly less than 0
+b_H1a <- fixef(mH1_all)["(Intercept)"]
+SE_H1a <- sqrt(diag(vcov(mH1_all))["(Intercept)"])
+z_H1a <- b_H1a / SE_H1a
+p_value_H1a <- pnorm(z_H1a) # left-tailed test
+H1a <- ifelse(p_value_H1a < alpha, 1, 0)
+
+H1a
+```
+
+## Question 1B
+
+Do people from individualistic and collectivistic cultures tend to correct less than half of their intuitive errors during deliberation or not?
+
+### Hypothesis 1B 
+
+We expect that people will provide less than half of the correct answers during deliberation in both more individualistic and more collectivistic geopolitical regions.
+
+(The dependent variable thus would be the same as for Hypothesis 1A.)
+
+### Power
+
+Power is the same as above.
+
+### Analysis
+
+We will repeat the same analysis as for H1A separately for each cultural category.
+
+### Interpretation 
+
+Intercept < 0 in both cultural contexts: Hypothesis supported; lower than 50% correct rate common across cultures.
+
+Intercept ≥ 0 in one or both cultural contexts: Hypothesis not supported; higher than 50% correct rate at least in one cultural context.
+
+```{r}
+# fit country_group-level models for weird and nonweird
+mH1_w <- glmer(
+        corrected ~ feedback * justification +
+                (feedback * justification || country),
+        family = binomial("logit"),
+        data = dat_H1[dat_H1$country_group == "weird", ],
+        control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+)
+
+mH1_nw <- glmer(
+        corrected ~ feedback * justification +
+                (feedback * justification || country),
+        family = binomial("logit"),
+        data = dat_H1[dat_H1$country_group == "non-weird", ],
+        control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+)
+
+# One-tailed tests for H1b
+models <- list(mH1_w, mH1_nw)
+names <- c("weird", "non-weird")
+H1b_pvals <- numeric(length(models))
+H1b_results <- numeric(length(models))
+
+for (i in 1:length(models)) {
+        b <- fixef(models[[i]])["(Intercept)"]
+        SE <- sqrt(diag(vcov(models[[i]]))["(Intercept)"])
+        z <- b / SE
+        p_value <- pnorm(z) # left-tailed test
+        H1b_pvals[i] <- p_value
+        H1b_results[i] <- ifelse(p_value < alpha, 1, 0)
+}
+
+names(H1b_pvals) <- names
+names(H1b_results) <- names
+
+# complete test
+H1b <- ifelse(all(H1b_results == 1), 1, 0)
+
+H1b
+```
+ 
+## Question 2A
 
 How does feedback on initial answers, as opposed to no feedback, affect an individual’s tendency to correct intuitive errors during deliberation?
 
-Hypothesis 2A 
+### Hypothesis 2A 
 
-We hypothesise that providing answer feedback will increase the correction rate relative to having no feedback
+We hypothesise that participants provided with accuracy feedback will be more likely to correct their intuitive incorrect answers than those who receive no feedback. 
 
-We will use a logistic multilevel model to compare the proportion of intuitive errors corrected in phase 2 between feedback and baseline conditions (one-tailed Wald test)
+(The dependent variable is the probability that participants correct their errors in phase 2 for all the other hypotheses. In set notation, this would be E1 ∩ C2 E1, where E1 indicates the items incorrectly answered in phase 1, while C2 indicates the items correctly answered in phase 2.)
 
-Positive feedback effect: Supports the hypothesis; feedback increases error correction.
+### Power
 
-No significant feedback effect: Hypothesis not supported; feedback does not increase error correction.
+Power is the same as above.
 
-Question 2B
-Do people across different cultures tend to correct their intuitive errors more if they receive answer feedback?
+### Analysis
 
-Hypothesis 2B 
+We will use a logistic multilevel model to compare the proportion of intuitive errors corrected in phase 2 between feedback and baseline conditions. The coefficient of feedback will be assessed using a one-tailed Wald test with p < .05 as the criterion.
 
-We expect that the feedback effect will occur in all cultural contexts included in our study
+### Interpretation
 
-Repeat the logistic multilevel model analysis as in 2A, separately for each cluster, to evaluate the impact of feedback on error correction.
+Positive feedback coefficient and p < .05: Supports the hypothesis; feedback increases error correction.
 
-Positive feedback effect in all clusters: Hypothesis supported; feedback universally increases error correction.
+Negative coefficient and/or p ≥ .05: Hypothesis not supported; feedback does not increase error correction.
 
-Feedback effect non significant in one or more clusters: Hypothesis not supported; feedback does not universally increase error correction.
+```{r}
+# fit overall model
+m_all <- glmer(
+        corrected ~ feedback * justification +
+                (feedback * justification || country),
+        family = binomial("logit"),
+        data = dat_Hother,
+        control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+)
 
-Question 3A
-How does requestingthe answer justification of answers, as opposed to no justification, affect an individual’s tendency to correct intuitive errors during deliberation?
+# H2
 
-Hypothesis 3A 
+# feedback increases correction rate
 
-We hypothesise that a request for justification of the answer will increase the error correction rate relative to a no justification condition.
+# One-tailed test for H2a
+# Testing if the coefficient for 'feedback' is significantly greater than 0
+b_H2a <- fixef(m_all)["feedback"]
+SE_H2a <- sqrt(diag(vcov(m_all))["feedback"])
+z_H2a <- b_H2a / SE_H2a
+p_value_H2a <- 1 - pnorm(z_H2a) # right-tailed test
+H2a <- ifelse(p_value_H2a < alpha, 1, 0)
 
-We will use a logistic multilevel model to compare the proportion of intuitive errors corrected in phase 2 between the answer-justification and baseline conditions (one-tailed Wald test)
+H2a
+```
 
-Positive answer-justification effect: Supports the hypothesis; requesting justification of answers increases error correction.
+## Question 2B
 
-No significant answer-justification effect: Hypothesis not supported; requesting justification of answers does not increase error correction.
+Do people from individualistic and collectivistic cultures tend to correct their intuitive errors more if they receive answer feedback?
 
-Question 3B
+### Hypothesis 2B 
 
-Do people across different cultures tend to correct their intuitive errors more if they are asked to justify their answers?
+We expect that the feedback effect will occur in both more individualistic and more collectivistic geopolitical regions.
 
-Hypothesis 3B
+(The dependent variable is the same as for hypothesis 2A.)
 
-We expect that the justification effect will occur in all cultural contexts included in our study.
+### Power 
 
-Repeat the logistic multilevel model analysis as in 3A, separately for each cluster, to evaluate the impact of request for justification on error correction.
+Power is the same as above.
 
-Positive answer-justification effect in all clusters: Hypothesis supported; requesting justification of answers universally increases error correction.
+### Analysis 
 
-Answer-justification effect non significant in one or more clusters: Hypothesis not supported; requesting justification of answers does not universally increase error correction.
+We will repeat the same analysis as for H2A to evaluate the impact of feedback on error correction separately for each cultural category.
 
+### Interpretation 
+
+Positive feedback coefficient and p < .05 effect in both cultural contexts: Hypothesis supported; feedback increases error correction in both geopolitical region categories.
+
+Feedback effect negative and/or p ≥ .05 in one or both cultural contexts: Hypothesis not supported; feedback does not increase error correction in both geopolitical region categories.
+ 
+```{r} 
+# fit country_group-level models for weird and non-weird
+m_w <- glmer(
+        corrected ~ feedback * justification +
+                (feedback * justification || country),
+        family = binomial("logit"),
+        data = dat_Hother[dat_Hother$country_group == "weird", ],
+        control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+)
+
+m_nw <- glmer(
+        corrected ~ feedback * justification +
+                (feedback * justification || country),
+        family = binomial("logit"),
+        data = dat_Hother[dat_Hother$country_group == "non-weird", ],
+        control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))
+)
+
+# One-tailed tests for H2b
+models <- list(m_w, m_nw)
+names <- c("weird", "non-weird")
+H2b_pvals <- numeric(length(models))
+H2b_results <- numeric(length(models))
+
+for (i in 1:length(models)) {
+        b <- fixef(models[[i]])["feedback"]
+        SE <- sqrt(diag(vcov(models[[i]]))["feedback"])
+        z <- b / SE
+        p_value <- 1 - pnorm(z) # right-tailed test
+        H2b_pvals[i] <- p_value
+        H2b_results[i] <- ifelse(p_value < alpha, 1, 0)
+}
+
+names(H2b_pvals) <- names
+names(H2b_results) <- names
+
+# complete test
+H2b <- ifelse(all(H2b_results == 1), 1, 0)
+
+H2b
+```
+
+## Question 3A
+
+How does requesting justification of answers, as opposed to no justification, affect an individual’s tendency to correct intuitive errors during deliberation?
+
+### Hypothesis 3A 
+
+We hypothesise that participants who know they will be asked to justify their answers will be more likely to correct their intuitive incorrect responses than those in the no justification condition. 
+
+(The dependent variable is the same as for hypothesis 2A.)
+
+### Power 
+
+Power is the same as above.
+
+### Analysis 
+
+We will use a logistic multilevel model to compare the proportion of intuitive errors corrected in phase 2 between the answer-justification and baseline conditions. The coefficient of justification will be assessed using a one-tailed Wald test with p < .05 as the criterion.
+
+### Interpretation 
+
+Positive answer-justification coefficient and p < .05: Supports the hypothesis; requesting justification of answers increases error correction.
+
+Negative answer-justification coefficient and/or p ≥ .05: Hypothesis not supported; requesting justification of answers does not increase error correction.
+
+```{r}
+# uses same model all from H2
+# H3
+# justification increases correction rate
+
+# One-tailed test for H3a
+# Testing if the coefficient for 'justification' is significantly greater than 0
+b_H3a <- fixef(m_all)["justification"]
+SE_H3a <- sqrt(diag(vcov(m_all))["justification"])
+z_H3a <- b_H3a / SE_H3a
+p_value_H3a <- 1 - pnorm(z_H3a) # right-tailed test
+H3a <- ifelse(p_value_H3a < alpha, 1, 0)
+```
+
+## Question 3B
+
+Do people from individualistic and collectivistic cultures tend to correct their intuitive errors more if they are asked to justify their answers?
+
+### Hypothesis 3B
+
+We expect that the justification effect will occur in both more individualistic and more collectivistic geopolitical regions.
+
+(The dependent variable is the same as for hypothesis 2A.)
+
+### Power
+
+Power is the same as above.
+
+### Analysis 
+
+We will repeat the same analysis as for H3A to evaluate the impact of request for justification on error correction separately for each cultural category.
+
+### Interpretation 
+
+Positive answer justification coefficient and p < .05 effect in both cultural contexts: Hypothesis supported; requesting justification of answers increases error correction in both geopolitical region categories.
+
+Justification effect negative and/or p ≥ .05 in one or both cultural contexts: Hypothesis not supported; requesting justification of answers does not increase error correction in both geopolitical region categories.
+
+```{r}
+# uses same model all from H2
+
+# One-tailed tests for H3b 
+models <- list(m_w, m_nw)
+names <- c("weird", "non-weird")
+H3b_pvals <- numeric(length(models))
+H3b_results <- numeric(length(models))
+
+for (i in 1:length(models)) {
+b <- fixef(models[[i]])["justification"]
+SE <- sqrt(diag(vcov(models[[i]]))["justification"])
+z <- b / SE
+p_value <- 1 - pnorm(z) # right-tailed test
+H3b_pvals[i] <- p_value
+H3b_results[i] <- ifelse(p_value < alpha, 1, 0)
+}
+
+names(H3b_pvals) <- names
+names(H3b_results) <- names
+
+# complete test
+H3b <- ifelse(all(H3b_results == 1), 1, 0)
+
+H3b
+```
