@@ -1,10 +1,11 @@
 ---
-title: "Manipulation Pretest: analyses & results"
+title: "Manipulation Pretest: Analyses & Results"
 author: "Matteo Lisi"
 date: "2024-05-20"
 output:
   html_document:
     toc: true
+    toc_float: true
     theme: united
     code_folding: show
 ---
@@ -17,10 +18,10 @@ library(kableExtra)
 
 # Load & prepare data
 
-
 ## R session
 
 Libraries used for this report:
+
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(qualtRics)
@@ -181,7 +182,6 @@ d <- bind_rows(duplicates, non_duplicates)
 <!-- write_csv(d, "manipcheckdata_afterExclusions.csv") -->
 <!-- ``` -->
 
-
 ## Demographics information of participants
 
 ```{r}
@@ -197,7 +197,6 @@ demographic_summary <- d %>%
 knitr::kable(demographic_summary, format = "html", booktabs = TRUE, caption = "Demographic Information of Participants", col.names = c("Demographic", "Value"))%>%
   kable_styling(latex_options = c("scale_down","striped"))
 ```
-
 
 ## Data Transformation
 
@@ -301,7 +300,6 @@ knitr::kable(stat_summary, format = "html", booktabs = TRUE, caption = "Summary 
   kable_styling(latex_options = c("scale_down","striped"))
 ```
 
-
 # Effect of response justification on accuracy
 
 First, we recode the contrasts of condition (`group`) such that the control group is the baseline.
@@ -328,7 +326,6 @@ m_logi <- glmer(accuracy ~ group  + (1|PROLIFIC_PID) + (1|crt), family=binomial(
 summary(m_logi)
 tab_model(m_logi, show.icc=FALSE, show.r2 = FALSE)
 ```
-
 
 ### Standardized effect sizes
 
@@ -360,7 +357,6 @@ CG <- dag$accuracy[dag$group=="CG"]
 (mean(IJ) - mean(CG)) / pooled_sd(IJ, CG)
 ```
 
-
 ## Does the improved wording make a difference?
 
 To directly test the difference between the `BJ` and `IJ` conditions, we can swap the dummy coding. Although numerically the accuracy is slightly higher in the `IJ` condition, the analysis below indicates that the difference is not statistically significant.
@@ -371,9 +367,7 @@ m_logi2 <- glmer(accuracy ~ group  + (1|PROLIFIC_PID) + (1|crt), family=binomial
 tab_model(m_logi2, show.r2 = FALSE, show.icc=FALSE)
 ```
 
-
 ## Plot
-
 
 ```{r, fig.align='center', fig.height=4, fig.width=6}
 # binomial standard error
@@ -444,7 +438,6 @@ t.test(dat_length$average_word_count[dat_length$group=="BJ"],
        dat_length$average_word_count[dat_length$group=="IJ"])
 ```
 
-
 # Time spent
 
 In this section, we compare the log-transformed response times across the different conditions.
@@ -479,7 +472,6 @@ Both `IJ` and `BJ` conditions exhibit longer response times compared to the cont
 ```{r}
 t.test(log_RT ~ group, dag_RT[dag_RT$group!='CG',])
 ```
-
 
 # Perceived effort
 
@@ -563,7 +555,6 @@ summary(m_review)
 tab_model(m_review, show.r2 = FALSE)
 ```
 
-
 # Use of external resources
 
 First, we compute a table indicating the count and fraction of participants reporting the use of external resources for each CRT item.
@@ -610,7 +601,6 @@ dag_resources %>%
 
 ```
 
-
 There appears to be no significant differences in the use of external resources among the groups. This was formally tested using a multilevel logistic regression.
 
 ```{r}
@@ -624,7 +614,6 @@ tab_model(m_res, show.r2 = FALSE, show.icc = FALSE)
 ## Effects of reported use of external resources on accuracy.
 
 We compute the accuracy split by whether participants reported using external resources or not. A logistic model indicates a clear effect of external resource use on accuracy. However, there does not seem to be an interaction effect, suggesting that the presence of response justification does not significantly influence the carefulness or attentiveness with which participants use external resources.
-
 
 ```{r}
 # Compute accuracy by external resource use
@@ -664,7 +653,6 @@ m_accres <- glmer(accuracy ~ group * used_external + (1|PROLIFIC_PID) + (1|CRT),
 summary(m_accres)
 tab_model(m_accres, show.r2 = FALSE, show.icc = FALSE)
 ```
-
 
 # Familiarity
 
@@ -721,7 +709,6 @@ summary(m_fam)
 tab_model(m_fam, show.r2 = FALSE)
 ```
 
-
 ### Familiarity: overall counts and proportion of responses
 
 ```{r}
@@ -743,7 +730,6 @@ familiarity_counts %>%
   knitr::kable(format = "html", booktabs = TRUE, caption = "Familiarity (counts summed across all CRT problems)")%>%
   kable_styling(latex_options = c("scale_down","striped"))
 ```
-
 
 ## Effects of familiarity on accuracy
 
