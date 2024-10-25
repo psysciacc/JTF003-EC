@@ -8,7 +8,6 @@ N_rep = as.numeric(cmd_args[3])
 weird_ratio = as.numeric(cmd_args[4])
 sim_label = cmd_args[5]
 
-
 # library
 library(tidyverse)
 

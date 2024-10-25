@@ -3,12 +3,12 @@ title: "Power Analyses"
 author: "Matteo Lisi, Erin Buchanan"
 date: "`r Sys.Date()`"
 output: 
-  html_document:
-    toc: true
-    toc_float: true
+ html_document:
+ toc: true
+ toc_float: true
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
@@ -22,62 +22,62 @@ library(lme4)
 
 ## Command Arguments
 
-The power analyses script `power-script-cluster.R` is designed to be run via Rscript in command line and receive some parameters as input. The simulation variable settings are as follow:
+The power analyses script `power-script-cluster.R` is designed to be run via Rscript in command line and receive some parameters as input.
 
-`N` = # of participants sampled, anywhere from 50-250 per simulation
+You would use `PSAsubmit.sh` on the command line that runs `PSA_sim_wrapper.sh`, sending the variable settings to `power-script-cluster.R`. 
+
+The simulation variable settings are as follow:
+
+`N` = # of participants sampled, anywhere from 25-250 per simulation
 `N_c` = # of countries sampled, anywhere from 30-50 per simulation
-`N_rep` = # of repetitions for the sample simulations, currently 5
-`sim_label` = used to differentiate various simulations (since they are usually launched in parallel on different cores)
-`weird_ratio` = fraction of countries in one cultural category (use to simulated imbalanced datasets)
+`N_rep` = # of repetitions for the sample simulations
+`wratio` = fraction of countries in one cultural category 
+`iteration` = the simulation label for saving files 
 
-```{r eval = F}
-cmd_args=commandArgs(TRUE)
-N = as.numeric(cmd_args[1])
-N_c = as.numeric(cmd_args[2])
-N_rep = as.numeric(cmd_args[3])
-weird_ratio = as.numeric(cmd_args[4])
-sim_label = cmd_args[5]
+```{r}
+N <- seq(from = 25, by = 25, to = 250)
+N_c <- seq(from = 30, by = 2, to = 50) 
+N_rep <- 50
+wratio <- 0.5 # used .3, .4, .5 ran separately
+iteration <- c("A", "B", "C", "D", "E", "F", "G", "H")
 ```
 
-The values for these are set in the `PSAsubmit.sh` bash script
+The values for these are set in the `PSAsubmit.sh` bash script:
 
 ```
 #!/bin/bash
 # File: PSAsubmit.sh
 
 # Generate the sequences for $1 and $2 using seq command in bash
-N=$(seq 25 25 250)
-N_c=$(seq 30 2 50)
-wratio=0.5
-N_rep=50
-iteration="A B C D E F G H"
+N = $(seq 25 25 250)
+N_c = $(seq 30 2 50)
+wratio = 0.5
+N_rep = 50
+iteration = "A B C D E F G H"
 
 
 # Iterate over the values for $1, $2 and iteration
 for val1 in $N
 do
-    for val2 in $N_c
-    do
-        for letter in $iteration
-        do
-            # Submit the job with current values
-            qsub PSA_sim_wrapper.sh $val1 $val2 $N_rep $wratio $letter
-        done
-    done
+ for val2 in $N_c
+ do
+ for letter in $iteration
+ do
+  # Submit the job with current values
+  qsub PSA_sim_wrapper.sh $val1 $val2 $N_rep $wratio $letter
+ done
+ done
 done
 ```
 
 ## Parameter Settings
 
-The first part of the power simulation script consists the setting of key simulation parameters
+The first part of the power simulation script consists the setting of key simulation parameters:
 
-- `err_mu` and `err_sd` are the mean and SD across participants of error rates (probability of answering a CRT problem incorrectly in the first intuitive phase), expressed in a log-odds scale;
-
-- `corr_mu`, and `corr_sd` are mean and SD across participants of correction rates - that is the probability that an error in the first intuitive phase is corrected in the second deliberative phase (see manuscript for details of the method);
-
-- `beta_lo_p` represented differences in correction rates between each condition [feedback, justification, both] relative to the baseline condition.
-
-- `n_trial` is set to 6 as we have 6 CRT problems in the study.
+- `err_mu` and `err_sd` are the mean and SD across participants of error rates (probability of answering a CRT problem incorrectly in the first intuitive phase), expressed in a log-odds scale
+- `corr_mu`, and `corr_sd` are mean and SD across participants of correction rates - that is the probability that an error in the first intuitive phase is corrected in the second deliberative phase (see manuscript for details of the method)
+- `beta_lo_p` represented differences in correction rates between each condition [feedback, justification, both] relative to the baseline condition
+- `n_trial` is set to 6 as we have 6 CRT problems in the study
 
 ```{r}
 # these are plausible parameter values based on Sirota 2023 and similar 
@@ -88,20 +88,20 @@ err_mu <- 1.22
 err_sd <- 0.92
 
 # p(correct @ stage 2 | error @ stage 1) 
-corr_mu <- -2.53  
+corr_mu <- -2.53 
 corr_sd <- 1.12
 
 # set effect sizes ----
 
 # Set effect values in standardized as Cohen's d and rescale 
-# to an approximately similar value for the logistic distribution; 
-# specifically we multiply the d values by the ratio of the standard deviation
+# to an approximately similar value for the logistic distribution. 
+# Specifically, we multiply the d values by the ratio of the standard deviation
 # of the logistic distribution to that of the standard normal distribution, 
 # which is (pi/sqrt(3)).
 d_fdbk <- 0.19 * (pi/sqrt(3)) # feedback minus baseline
 d_just <- 0.19 * (pi/sqrt(3)) # justification minus baseline
-d_both <- (d_fdbk + d_just)  # (feedback + justification) minus baseline 
-# Note: we expects the effects of feedback to be additive
+d_both <- (d_fdbk + d_just) # (feedback + justification) minus baseline 
+# Note: we expect the effects of feedback to be additive
 
 # vector of fixed-effects coefficients
 beta_lo_p <- c(corr_mu, NA, NA, NA)
@@ -112,7 +112,7 @@ beta_lo_p[4] <- d_both
 # determine the country-level random effect SD
 # half the group-level effect size, so that ~95% of countries have 
 # population-level effects of the same sign
-rfx_sd_country  <- (0.19 * (pi/sqrt(3))) / 2 
+rfx_sd_country <- (0.19 * (pi/sqrt(3))) / 2 
 
 # power simulation parameters ----
 n_trial <- 6
@@ -122,115 +122,103 @@ n_trial <- 6
 
 This function generate a simulated dataset based on input values. In words, this function
 
-1. sample simulated log-odds of errors in intuitive phase (`error_lo`) for each participants from the population distribution defined by `err_mu` and `err_sd`. If we write as $\log \text{OR}_p $ the log-odds that participant $p$ makes an error in the intuitive phase, we can write this step as $$\log \text{OR}_p \sim \mathcal{N}(\mu=\text{err_mu}, \sigma=\text{err_sd})$$. 
+1. sample simulated log-odds of errors in intuitive phase (`error_lo`) for each participants from the population distribution defined by `err_mu` and `err_sd`. If we write as $\log \text{OR}_p $ the log-odds that participant $p$ makes an error in the intuitive phase, we can write this step as $$\log \text{OR}_p \sim \mathcal{N}(\mu = \text{err_mu}, \sigma = \text{err_sd})$$. 
 
 2. sample individual deviation from the mean log-odds of correcting errors in phase 2 (`rfx_id`) as well as country-specific deviations (`rfx_country`);
 
 3. determine the log-dds of correcting errors of each participant (`lo`) taking into account both the country and the condition they are in.
 
-4. Sample the actual number of errors (using `rbinom`) to generate number of errors in the intuitive phase (`dat$error`) and how many of these are corrected in the second deliberative phase (`dat$corrected`). For example, the number of error in phase 1 pf participant $p$ would be notated as $$ \text{N. errors}_p \sim \text{Binomial} \left(\frac{\exp(\log \text{OR}_p)}{1+\exp(\log \text{OR}_p)}, \, 6 \right)$$
-
-
-<!-- $\hat{Y} ~ b_0 + b_1X + \epsilon_p + \epsilon_c$ - data generating information -->
-
-<!-- `b_0`: average score across participants (so this is `beta_lo_p[1]`) -->
-
-<!-- `b_1`: difference score between control and other condition (feedback, justification, both) -->
-
-<!--   - but to make up the data, you simply make the control group X = 0, so no effect of slope, and then add the effects of conditions to the control group score  -->
-
-<!-- `\epsilon_p`: random effect of participant: can't everyone's score perfectly right, so each person has a small residual between our guess `\hat{Y}` and their actual Y -->
-
-<!--   - need to add this noise so that not every person in every country has the same scores  -->
-
-<!-- `\epsilon_c`: random effect of country group: the amount of residual that's due to country level influences  -->
+4. Sample the actual number of errors (using `rbinom`) to generate number of errors in the intuitive phase (`dat$error`) and how many of these are corrected in the second deliberative phase (`dat$corrected`). For example, the number of error in phase 1 pf participant $p$ would be notated as $$ \text{N. errors}_p \sim \text{Binomial} \left(\frac{\exp(\log \text{OR}_p)}{1 + \exp(\log \text{OR}_p)}, \, 6 \right)$$
 
 ```{r}
 # data simulation function
-# data simulation function
-gen_data <- function(N, N_c, weird_ratio){
-  
-  N_tot <- N * N_c * 4 # 4 is the number of between subjects conditions
-  
-  ## simulate dataset
-  # simulate error propensity of individual participants in phase 1
-  # simulate number of errors in phase 1
-  # number of errors (log(errors))
-  error_lo <- rnorm(N_tot, mean=err_mu, sd=err_sd)
-  
-  # simulate random effects and between-individual variability 
-  # (to introduce heterogeneity and make simulations more realistic)
-  rfx_id <- rnorm(N_tot, mean=0, sd=corr_sd)
-  
-  # sample countries
-  rfx_country <- rnorm(N_c, mean=0, sd=rfx_sd_country)
-  group_country <- generate_labels(N_c, weird_ratio)   
-  
-  # create dataset frame
-  dat <- expand_grid(country = 1:N_c,
-                     condition = 1:4,
-                     id = 1:N,
-                     trial=1:6) %>%
-    mutate(id = str_c(id,country,condition,sep="_"))
-  dat$country_group <- group_country[dat$country]
-  
-  # simulate responses
-  dat$corrected <- NA
-  dat$error <- NA
-  dat$id <- as.integer(factor(dat$id, labels=1:length(unique(dat$id))))
-  dat$lo <- NA
-  dat$error_lo <- error_lo[dat$id]
-  dat$rfx_country <- rfx_country[dat$country]
-  dat$rfx_id <- rfx_id[dat$id]
-  
-  # set log-odds of p(correction) for each datapoint
-  dat <- dat %>%
-    # control group, baseline who don't get anything (beta_lo_p[1])
-    # intercept (control group mean because X1 is the group they are in)
-    # intercept beta_lo_p[1] + group*0 + country random + person random effect
-    mutate(lo = beta_lo_p[1]+rfx_country+rfx_id) %>%
-    mutate(lo = case_when(
-      # when group 1 baseline keep the original estimation from the line above 
-      condition==1 ~ lo,
-      # when group is not baseline (feedback, justification, both) then add in the effect of those other conditions 
-      condition==2 ~ lo + beta_lo_p[2],
-      condition==3 ~ lo + beta_lo_p[3],
-      condition==4 ~ lo + beta_lo_p[4]
-    ))
-  
-  # simulate number of errors ##stopped here## 
-  dat$error <- rbinom(nrow(dat), size=1, p=exp(dat$error_lo)/(1+exp(dat$error_lo)))
-  
-  # simulate number of errors that are corrected in phase 2
-  dat$corrected <- ifelse(dat$error==1,
-                          rbinom(nrow(dat), size=1, p=exp(dat$lo)/(1+exp(dat$lo))),
-                          0)
-  
-  # total correct responses
-  dat$correct <- 1-dat$error + dat$corrected
-  
-  # keep only trials with errors in phase 1
-  dat <- dat %>%
-    # filter(error==1) %>%
-    mutate(c_F = ifelse(condition==2,1,0),
-           c_FR = ifelse(condition==3,1,0)) %>%
-    mutate(feedback=ifelse(condition==2 | condition==4, 1, 0),
-           justification=ifelse(condition==3 | condition==4, 1, 0),
-           condition = case_when(
-             condition==1 ~ "baseline",
-             condition==2 ~ "feedback",
-             condition==3 ~ "justification",
-             condition==4 ~ "feedback+justification"
-           ))
-  
-  dat$country_group <- factor(dat$country_group)
-  
-  # Set attributes
-  attr(dat, "N") <- N
-  attr(dat, "N_c") <- N_c
-  
-  # return simulated data
-  return(dat)
+gen_data <- function(N, N_c, wratio){
+ 
+ N_tot <- N * N_c * 4 # 4 is the number of between subjects conditions
+ 
+ ## simulate dataset
+ # simulate error propensity of individual participants in phase 1
+ # simulate number of errors in phase 1
+ # number of errors (log(errors))
+ error_lo <- rnorm(N_tot, mean = err_mu, sd = err_sd)
+ 
+ # simulate random effects and between-individual variability 
+ # (to introduce heterogeneity and make simulations more realistic)
+ rfx_id <- rnorm(N_tot, mean = 0, sd = corr_sd)
+ 
+ # sample countries
+ rfx_country <- rnorm(N_c, mean = 0, sd = rfx_sd_country)
+ group_country <- generate_labels(N_c, wratio) 
+ 
+ # create dataset frame
+ dat <- expand_grid(country = 1:N_c, 
+   condition = 1:4, 
+   id = 1:N, 
+   trial = 1:6) %>%
+ mutate(id = str_c(id, country, condition, sep = "_"))
+ dat$country_group <- group_country[dat$country]
+ 
+ # simulate responses
+ dat$corrected <- NA
+ dat$error <- NA
+ dat$id <- as.integer(factor(dat$id, labels = 1:length(unique(dat$id))))
+ dat$lo <- NA
+ dat$error_lo <- error_lo[dat$id]
+ dat$rfx_country <- rfx_country[dat$country]
+ dat$rfx_id <- rfx_id[dat$id]
+ 
+ # set log-odds of p(correction) for each datapoint
+ dat <- dat %>%
+ # control group, baseline who don't get anything (beta_lo_p[1])
+ # intercept (control group mean because X1 is the group they are in)
+ # intercept beta_lo_p[1] + group*0 + country random + person random effect
+ mutate(lo = beta_lo_p[1] + rfx_country + rfx_id) %>%
+ mutate(lo = case_when(
+ # when group 1 baseline keep the original estimation from the line above 
+ condition == 1 ~ lo, 
+ # when group is not baseline (feedback, justification, both) then add in the effect of those other conditions 
+ condition == 2 ~ lo + beta_lo_p[2], 
+ condition == 3 ~ lo + beta_lo_p[3], 
+ condition == 4 ~ lo + beta_lo_p[4]
+ ))
+ 
+ # simulate number of errors likely for participants
+ dat$error <- rbinom(nrow(dat), 
+   size = 1, 
+   p = exp(dat$error_lo)/(1 + exp(dat$error_lo)))
+ 
+ # simulate number of errors that are corrected in phase 2
+ dat$corrected <- ifelse(dat$error == 1, 
+    rbinom(nrow(dat), 
+     size = 1, 
+     p = exp(dat$lo)/(1 + exp(dat$lo))), 
+    0)
+ 
+ # total correct responses given the simulated data
+ dat$correct <- 1-dat$error + dat$corrected
+ 
+ # keep only trials with errors in phase 1
+ dat <- dat %>%
+ # filter(error == 1) %>%
+ mutate(c_F = ifelse(condition == 2, 1, 0), 
+  c_FR = ifelse(condition == 3, 1, 0)) %>%
+ mutate(feedback = ifelse(condition == 2 | condition == 4, 1, 0), 
+  justification = ifelse(condition == 3 | condition == 4, 1, 0), 
+  condition = case_when(
+  condition == 1 ~ "baseline", 
+  condition == 2 ~ "feedback", 
+  condition == 3 ~ "justification", 
+  condition == 4 ~ "feedback + justification"
+  ))
+ 
+ dat$country_group <- factor(dat$country_group)
+ 
+ # Set attributes
+ attr(dat, "N") <- N
+ attr(dat, "N_c") <- N_c
+ 
+ # return simulated data
+ return(dat)
 }
 ```
 
@@ -238,18 +226,18 @@ Note that the function above calls also this other function to generate a set of
 
 ```{r}
 # country grouping labels
-generate_labels <- function(N_c, weird_ratio = 0.5) {
-  n_weird <- round(weird_ratio * N_c)
-  n_nonweird <- N_c - n_weird
-  labels <- c(
-      rep("weird", n_weird),
-      rep("non-weird", n_nonweird)
-    )[sample(N_c)]
-  return(labels)
+generate_labels <- function(N_c, wratio = 0.5) {
+ n_weird <- round(wratio * N_c)
+ n_nonweird <- N_c - n_weird
+ labels <- c(
+ rep("weird", n_weird), 
+ rep("non-weird", n_nonweird)
+ )[sample(N_c)]
+ return(labels)
 }
 ```
 
-## Test hypotheses Function
+## Test Hypotheses Function
 
 The function below test all the hypotheses as outlined in the manuscript. Note that the dependent variable is slightly different for H1a and H1b compared to the other hypotheses. Specifically, for hypotheses H1A and H1B the variable of interest is the proportion of correct responses made in phase 2 (out of all correct responses given in phase 1 and 2); in set notation, this would be $\frac{|C_2 \setminus C_1|}{|C_1 \cup C_2|}$ where $C_1$ and $C_2$ are the items correctly answered in phase 1 and 2, respectively. 
 
@@ -257,190 +245,223 @@ For the remaining hypotheses, the variable of interest is the probability that p
 
 ```{r}
 test_hypotheses <- function(dat){
-  
-  require(lme4)
-  # dat <- gen_data(100, 30, 0.6)
-  
-  dat_H1 <- dat %>%
-    filter(correct==1)
-  
-  dat <- dat %>%
-    filter(error==1)
-  
-  ## FIT MODELS
-  
-  # fit overall model
-  m_all <- glmer(corrected ~ feedback * justification + (feedback * justification||country),
-                 family=binomial("logit"), data=dat,
-                 control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
-  
-  # fit country_group-level models
-  m_w <- glmer(corrected ~  feedback * justification + (feedback * justification||country),
-                  family=binomial("logit"), data=dat[dat$country_group=="weird",],
-                  control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
-  
-  m_nw <- glmer(corrected ~  feedback * justification + (feedback * justification||country),
-                   family=binomial("logit"), data=dat[dat$country_group=="non-weird",],
-                   control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
-  
-  
-  # now fit models for H1 specifically: note that here the dependent variable is different
-  # as the hypothesis is about the proportion of correct response (out of all correct responses)
-  # that are corrected in phase 2 ('data' arguments is set to 'dat_H1' instead of just 'dat')
-  # 
-  mH1_all <- glmer(corrected ~ feedback * justification + (feedback * justification||country),
-                   family=binomial("logit"), data=dat_H1,
-                   control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
-  
-  # fit country_group-level models
-  mH1_w <- glmer(corrected ~ feedback * justification + (feedback * justification||country),
-                    family=binomial("logit"), data=dat_H1[dat_H1$country_group=="weird",],
-                    control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
-  
-  mH1_nw <- glmer(corrected ~ feedback * justification + (feedback * justification||country),
-                     family=binomial("logit"), data=dat_H1[dat_H1$country_group=="non-weird",],
-                     control = glmerControl(optimizer="bobyqa",optCtrl = list(maxfun=1e5)))
-  
+ 
+ require(lme4)
+ # dat <- gen_data(100, 30, 0.6)
+ 
+ dat_H1 <- dat %>%
+ filter(correct == 1)
+ 
+ dat <- dat %>%
+ filter(error == 1)
+ 
+ ## FIT MODELS
+ 
+ # fit overall model
+ m_all <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||country), 
+   family = binomial("logit"), 
+   data = dat, 
+   control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+ 
+ # fit country_group-level models for weird and non-weird
+ m_w <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||country), 
+  family = binomial("logit"), 
+  data = dat[dat$country_group == "weird", ], 
+  control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+ 
+ m_nw <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||country), 
+  family = binomial("logit"), 
+  data = dat[dat$country_group == "non-weird", ], 
+  control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+ 
+ 
+ # now fit models for H1 specifically: note that here the dependent 
+ # variable is different as the hypothesis is about the proportion of 
+ # correct response (out of all correct responses) that are corrected 
+ # in phase 2 ('data' arguments is set to 'dat_H1' instead of just 'dat')
+ # 
+ mH1_all <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||country), 
+   family = binomial("logit"), data = dat_H1, 
+   control = glmerControl(optimizer = "bobyqa", 
+      optCtrl = list(maxfun = 1e5)))
+ 
+ # fit country_group-level models for weird and nonweird
+ mH1_w <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||country), 
+   family = binomial("logit"), 
+   data = dat_H1[dat_H1$country_group == "weird", ], 
+   control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+ 
+ mH1_nw <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||country), 
+   family = binomial("logit"), 
+   data = dat_H1[dat_H1$country_group == "non-weird", ], 
+   control = glmerControl(optimizer = "bobyqa", 
+      optCtrl = list(maxfun = 1e5)))
+ 
 
-  ## TEST HYPOTHESES
-  
-  alpha <- 0.05
-  # note: the tests on separate country_groups are independent one another 
-  # (different countries, participants, labs, etc.), so the expected false positive
-  # rate of the composite test, run on the 2 country_group separately and using the 
-  # conventional alpha=0.05 for each test, would be 0.05^2 = 0.0025 (the 
-  # hypothesis supported if and only if all 2 independent tests are significant)
-  # We don't also apply correction for multiple comparisons otherwise it would become 
-  # too conservative.
-  
-  # -----------
-  # H1 
-  # # p_correction < 0.5 
-  
-  # One-tailed test for H1a
-  # Testing if the intercept is significantly less than 0
-  b_H1a <- fixef(mH1_all)["(Intercept)"]
-  SE_H1a <- sqrt(diag(vcov(mH1_all))["(Intercept)"])
-  z_H1a <- b_H1a / SE_H1a
-  p_value_H1a <- pnorm(z_H1a) # left-tailed test
-  H1a <- ifelse(p_value_H1a < alpha, 1, 0)
-  
-  # One-tailed tests for H1b 
-  models <- list(mH1_w, mH1_nw)
-  names <- c("weird", "non-weird")
-  H1b_pvals <- numeric(length(models))
-  H1b_results <- numeric(length(models))
-  
-  for (i in 1:length(models)) {
-    b <- fixef(models[[i]])["(Intercept)"]
-    SE <- sqrt(diag(vcov(models[[i]]))["(Intercept)"])
-    z <- b / SE
-    p_value <- pnorm(z) # left-tailed test
-    H1b_pvals[i] <- p_value
-    H1b_results[i] <- ifelse(p_value < alpha, 1, 0)
-  }
-  
-  names(H1b_pvals) <- names
-  names(H1b_results) <- names
-  
-  # complete test
-  H1b <- ifelse(all(H1b_results == 1), 1, 0)
-  
-  # -----------
-  # H2
-  
-  # feedback increases correction rate
-  
-  # One-tailed test for H2a
-  # Testing if the coefficient for 'feedback' is significantly greater than 0
-  b_H2a <- fixef(m_all)["feedback"]
-  SE_H2a <- sqrt(diag(vcov(m_all))["feedback"])
-  z_H2a <- b_H2a / SE_H2a
-  p_value_H2a <- 1 - pnorm(z_H2a) # right-tailed test
-  H2a <- ifelse(p_value_H2a < alpha, 1, 0)
-  
-  # One-tailed tests for H2b
-  models <- list(m_w, m_nw)
-  names <- c("weird", "non-weird")
-  H2b_pvals <- numeric(length(models))
-  H2b_results <- numeric(length(models))
-  
-  for (i in 1:length(models)) {
-    b <- fixef(models[[i]])["feedback"]
-    SE <- sqrt(diag(vcov(models[[i]]))["feedback"])
-    z <- b / SE
-    p_value <- 1 - pnorm(z) # right-tailed test
-    H2b_pvals[i] <- p_value
-    H2b_results[i] <- ifelse(p_value < alpha, 1, 0)
-  }
-  
-  names(H2b_pvals) <- names
-  names(H2b_results) <- names
-  
-  # complete test
-  H2b <- ifelse(all(H2b_results == 1), 1, 0)
-  
-  # -----------
-  # H3
-  
-  # justification increases correction rate
-  
-  # One-tailed test for H3a
-  # Testing if the coefficient for 'justification' is significantly greater than 0
-  b_H3a <- fixef(m_all)["justification"]
-  SE_H3a <- sqrt(diag(vcov(m_all))["justification"])
-  z_H3a <- b_H3a / SE_H3a
-  p_value_H3a <- 1 - pnorm(z_H3a) # right-tailed test
-  H3a <- ifelse(p_value_H3a < alpha, 1, 0)
-  
-  # One-tailed tests for H3b 
-  models <- list(m_w, m_nw)
-  names <- c("weird", "non-weird")
-  H3b_pvals <- numeric(length(models))
-  H3b_results <- numeric(length(models))
-  
-  for (i in 1:length(models)) {
-    b <- fixef(models[[i]])["justification"]
-    SE <- sqrt(diag(vcov(models[[i]]))["justification"])
-    z <- b / SE
-    p_value <- 1 - pnorm(z) # right-tailed test
-    H3b_pvals[i] <- p_value
-    H3b_results[i] <- ifelse(p_value < alpha, 1, 0)
-  }
-  
-  names(H3b_pvals) <- names
-  names(H3b_results) <- names
-  
-  # complete test
-  H3b <- ifelse(all(H3b_results == 1), 1, 0)
-  
-  
-  # save results -----------
-  
-  # retrieve settings
-  N <- attr(dat, "N")
-  N_c <- attr(dat, "N_c")
-  N_tot <- N * N_c * 4
-  
-  d_line <- data.frame(N_per_condition = N,
-                       N_tot = N_tot,
-                       N_countries = N_c,
-                       H1a, H1b, 
-                       H2a, H2b, 
-                       H3a, H3b)
-  
-  return(d_line)
-  
+ ## TEST HYPOTHESES
+ 
+ alpha <- 0.05
+ # note: the tests on separate country_groups are independent one another 
+ # (different countries, participants, labs, etc.), so the expected 
+ # false positive rate of the composite test, run on the 2 country_group 
+ # separately and using the conventional alpha = 0.05 for each test, 
+ # would be 0.05^2 = 0.0025 (the hypothesis supported if and only if 
+ # all 2 independent tests are significant). We don't also apply correction 
+ # for multiple comparisons otherwise it would become too conservative.
+ 
+ # -----------
+ # H1 
+ # # p_correction < 0.5 
+ 
+ # One-tailed test for H1a
+ # Testing if the intercept is significantly less than 0
+ b_H1a <- fixef(mH1_all)["(Intercept)"]
+ SE_H1a <- sqrt(diag(vcov(mH1_all))["(Intercept)"])
+ z_H1a <- b_H1a / SE_H1a
+ p_value_H1a <- pnorm(z_H1a) # left-tailed test
+ H1a <- ifelse(p_value_H1a < alpha, 1, 0)
+ 
+ # One-tailed tests for H1b 
+ models <- list(mH1_w, mH1_nw)
+ names <- c("weird", "non-weird")
+ H1b_pvals <- numeric(length(models))
+ H1b_results <- numeric(length(models))
+ 
+ for (i in 1:length(models)) {
+ b <- fixef(models[[i]])["(Intercept)"]
+ SE <- sqrt(diag(vcov(models[[i]]))["(Intercept)"])
+ z <- b / SE
+ p_value <- pnorm(z) # left-tailed test
+ H1b_pvals[i] <- p_value
+ H1b_results[i] <- ifelse(p_value < alpha, 1, 0)
+ }
+ 
+ names(H1b_pvals) <- names
+ names(H1b_results) <- names
+ 
+ # complete test
+ H1b <- ifelse(all(H1b_results == 1), 1, 0)
+ 
+ # -----------
+ # H2
+ 
+ # feedback increases correction rate
+ 
+ # One-tailed test for H2a
+ # Testing if the coefficient for 'feedback' is significantly greater than 0
+ b_H2a <- fixef(m_all)["feedback"]
+ SE_H2a <- sqrt(diag(vcov(m_all))["feedback"])
+ z_H2a <- b_H2a / SE_H2a
+ p_value_H2a <- 1 - pnorm(z_H2a) # right-tailed test
+ H2a <- ifelse(p_value_H2a < alpha, 1, 0)
+ 
+ # One-tailed tests for H2b
+ models <- list(m_w, m_nw)
+ names <- c("weird", "non-weird")
+ H2b_pvals <- numeric(length(models))
+ H2b_results <- numeric(length(models))
+ 
+ for (i in 1:length(models)) {
+ b <- fixef(models[[i]])["feedback"]
+ SE <- sqrt(diag(vcov(models[[i]]))["feedback"])
+ z <- b / SE
+ p_value <- 1 - pnorm(z) # right-tailed test
+ H2b_pvals[i] <- p_value
+ H2b_results[i] <- ifelse(p_value < alpha, 1, 0)
+ }
+ 
+ names(H2b_pvals) <- names
+ names(H2b_results) <- names
+ 
+ # complete test
+ H2b <- ifelse(all(H2b_results == 1), 1, 0)
+ 
+ # -----------
+ # H3
+ 
+ # justification increases correction rate
+ 
+ # One-tailed test for H3a
+ # Testing if the coefficient for 'justification' is significantly greater than 0
+ b_H3a <- fixef(m_all)["justification"]
+ SE_H3a <- sqrt(diag(vcov(m_all))["justification"])
+ z_H3a <- b_H3a / SE_H3a
+ p_value_H3a <- 1 - pnorm(z_H3a) # right-tailed test
+ H3a <- ifelse(p_value_H3a < alpha, 1, 0)
+ 
+ # One-tailed tests for H3b 
+ models <- list(m_w, m_nw)
+ names <- c("weird", "non-weird")
+ H3b_pvals <- numeric(length(models))
+ H3b_results <- numeric(length(models))
+ 
+ for (i in 1:length(models)) {
+ b <- fixef(models[[i]])["justification"]
+ SE <- sqrt(diag(vcov(models[[i]]))["justification"])
+ z <- b / SE
+ p_value <- 1 - pnorm(z) # right-tailed test
+ H3b_pvals[i] <- p_value
+ H3b_results[i] <- ifelse(p_value < alpha, 1, 0)
+ }
+ 
+ names(H3b_pvals) <- names
+ names(H3b_results) <- names
+ 
+ # complete test
+ H3b <- ifelse(all(H3b_results == 1), 1, 0)
+ 
+ 
+ # save results -----------
+ 
+ # retrieve settings
+ N <- attr(dat, "N")
+ N_c <- attr(dat, "N_c")
+ N_tot <- N * N_c * 4
+ 
+ d_line <- data.frame(N_per_condition = N, 
+   N_tot = N_tot, 
+   N_countries = N_c, 
+   H1a, H1b, 
+   H2a, H2b, 
+   H3a, H3b)
+ 
+ return(d_line)
+ 
 }
+```
+
+## Test It
+
+If you want to test how this code works, here's an example:
+
+```{r}
+N <- 25
+N_c <- 30
+wratio <- 0.5
+
+d_line <- test_hypotheses(gen_data(N, N_c, wratio))
+d_line
 ```
 
 ## Results
 
 Running the script `PSA_pwr_script_cluster.R` on multiple cores would return multiple `*.csv` files. Assuming these are all placed in a folder called `results` these can be combined simply by running
 
-```{r, eval=FALSE}
+```{r, eval = FALSE}
 folder_path <- "results"
-csv_files <- list.files(path = folder_path, pattern = "*.csv", full.names = TRUE)
+csv_files <- list.files(path = folder_path, 
+   pattern = "*.csv", 
+   full.names = TRUE)
 d <- bind_rows(lapply(csv_files, read.csv))
 ```
 
@@ -451,253 +472,278 @@ d <- read_csv("power_sim_results.csv")
 str(d)
 ```
 
-here `smaller_fraction` is an additional variable that correspond to the fraction of countries in the smaller category, which was added when the results were compiled to identify runs with different values of `weird_ratio`. Below we report code and plots of estimated power separately for 50-50, 60-40 and 70-30 splits of countries in cultural categories.
+Here `smaller_fraction` is an additional variable that correspond to the fraction of countries in the smaller category, which was added when the results were compiled to identify runs with different values of `wratio`. Below we report code and plots of estimated power separately for 50-50, 60-40 and 70-30 splits of countries in cultural categories.
 
 For the plots, binomial standard errors for each set of simulations are computed with: 
 
 ```{r}
 binomSEM <- function (v) {
-    sqrt((mean(v) * (1 - mean(v)))/length(v))
+ sqrt((mean(v) * (1 - mean(v)))/length(v))
 }
 ```
 
 ### 50-50
 
-```{r, fig.align='center'}
-
+```{r, fig.align = 'center'}
+# smaller_fraction ratio 
 ratio_small <- 0.5
 
 # Reshape the data 
 data_long <- d %>%
-  filter(smaller_fraction==ratio_small) %>%
-  gather(key = "hypothesis", value = "value", starts_with("H")) %>%
-  filter(!is.na(value))
+ filter(smaller_fraction == ratio_small) %>%
+ gather(key = "hypothesis", value = "value", starts_with("H")) %>%
+ filter(!is.na(value))
 
+# create an average data by total N, N per condition, 
+# countries, and hypotheses
 data_long_avg <- data_long %>%
-  group_by(N_tot, N_per_condition, N_countries, hypothesis) %>%
-  summarise(
-    se_value = binomSEM(value),
-    value = mean(value)
-  )
+ group_by(N_tot, N_per_condition, N_countries, hypothesis) %>%
+ summarise(
+ se_value = binomSEM(value), 
+ value = mean(value)
+ )
 
 # plot split according to number of countries 
-ggplot(data_long, aes(x = N_per_condition, y = value, color = as.factor(N_countries))) + 
-  geom_point(data=data_long_avg) +
-  geom_errorbar(data=data_long_avg, aes(ymin=value-se_value, ymax=value+se_value), width=0)+
-  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
-  facet_wrap(~hypothesis) +
-  labs(color = "N. countries", x="N participants per condition",y="power") +
-  geom_hline(yintercept=0.8, lty=2)+
-  geom_hline(yintercept=0.95, lty=3)+
-  coord_cartesian(ylim=c(0.5,1))+
-  theme_minimal()
+ggplot(data_long, aes(x = N_per_condition, 
+   y = value, color = as.factor(N_countries))) + 
+ geom_point(data = data_long_avg) + 
+ geom_errorbar(data = data_long_avg, 
+  aes(ymin = value-se_value, ymax = value + se_value), width = 0) + 
+ geom_smooth(method = "glm", 
+  method.args = list(family = "binomial"), se = FALSE) + 
+ facet_wrap(~hypothesis) + 
+ labs(color = "N. countries", x = "N participants per condition", y = "power") + 
+ geom_hline(yintercept = 0.8, lty = 2) + 
+ geom_hline(yintercept = 0.95, lty = 3) + 
+ coord_cartesian(ylim = c(0.5, 1)) + 
+ theme_minimal()
 
 # plot only as a function of number of participants
 data_long_avg2 <- data_long %>%
-  mutate(N_per_grouping = ratio_small* N_tot) %>%
-  group_by(N_per_grouping, hypothesis) %>%
-  summarise(
-    se_value = binomSEM(value),
-    value = mean(value)
-  )
+ mutate(N_per_grouping = ratio_small* N_tot) %>%
+ group_by(N_per_grouping, hypothesis) %>%
+ summarise(
+ se_value = binomSEM(value), 
+ value = mean(value)
+ )
 
+# add n per group to the data 
 data_long <- data_long %>%
-  mutate(N_per_grouping = ratio_small* N_tot)
+ mutate(N_per_grouping = ratio_small * N_tot)
 
-ggplot(data_long, aes(x = N_per_grouping, y = value, color=hypothesis, group=hypothesis)) + 
-  geom_point(data=data_long_avg2) +
-  geom_errorbar(data=data_long_avg2, aes(ymin=value-se_value, ymax=value+se_value), width=0)+
-  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, n=500) +
-  labs(x="N participants per cultural 'grouping'",y="power") +
-  geom_hline(yintercept=0.8, lty=2)+
-  geom_hline(yintercept=0.95, lty=3)+
-  coord_cartesian(ylim=c(0.6,1), xlim=c(1250, 5000))+
-  scale_x_continuous(breaks=seq(0, 10000, 250),guide = guide_axis(angle = 90))+
-  theme_minimal()
-
+# plot of n per group 
+ggplot(data_long, aes(x = N_per_grouping, 
+                      y = value, color = hypothesis, group = hypothesis)) + 
+ geom_point(data = data_long_avg2) + 
+ geom_errorbar(data = data_long_avg2, 
+               aes(ymin = value-se_value, ymax = value + se_value), width = 0) + 
+ geom_smooth(method = "glm", 
+             method.args = list(family = "binomial"), se = FALSE, n = 500) + 
+ labs(x = "N participants per cultural 'grouping'", y = "power") + 
+ geom_hline(yintercept = 0.8, lty = 2) + 
+ geom_hline(yintercept = 0.95, lty = 3) + 
+ coord_cartesian(ylim = c(0.6, 1), xlim = c(1250, 5000)) + 
+ scale_x_continuous(breaks = seq(0, 10000, 250), 
+                    guide = guide_axis(angle = 90)) + 
+ theme_minimal()
 
 ## plot p(all inferences correct)
-d$value <- ifelse(d$H1a + d$H1b + d$H2a + d$H2b + d$H3a + d$H3b ==6,1,0)
+d$value <- ifelse(d$H1a + d$H1b + d$H2a + d$H2b + d$H3a + d$H3b == 6, 1, 0)
 
 data_avg2 <- d %>%
-  filter(smaller_fraction==ratio_small) %>%
-  group_by(N_tot) %>%
-  summarise(
-    se_value = mlisi::binomSEM(value),
-    value = mean(value)
-  )
+ filter(smaller_fraction == ratio_small) %>%
+ group_by(N_tot) %>%
+ summarise(
+ se_value = binomSEM(value), 
+ value = mean(value)
+ )
 
 d %>%
-  filter(smaller_fraction==ratio_small) %>%
-  ggplot(aes(x = N_tot, y = value)) +
-  geom_point(data=data_avg2) +
-  geom_errorbar(data=data_avg2, aes(ymin=value-se_value, ymax=value+se_value), width=0)+
-  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
-  geom_hline(yintercept=0.95, lty=2)+
-  geom_hline(yintercept=0.8, lty=3)+
-  coord_cartesian(ylim=c(0,1))+
-  labs(x="N total'",y="probability that all inferences are correct") +
-  theme_minimal()
-
+ filter(smaller_fraction == ratio_small) %>%
+ ggplot(aes(x = N_tot, y = value)) + 
+ geom_point(data = data_avg2) + 
+ geom_errorbar(data = data_avg2, 
+               aes(ymin = value-se_value, ymax = value + se_value), width = 0) + 
+ geom_smooth(method = "glm", 
+             method.args = list(family = "binomial"), se = FALSE) + 
+ geom_hline(yintercept = 0.95, lty = 2) + 
+ geom_hline(yintercept = 0.8, lty = 3) + 
+ coord_cartesian(ylim = c(0, 1)) + 
+ labs(x = "N total'", y = "probability that all inferences are correct") + 
+ theme_minimal()
 ```
 
 ### 60-40
 
-```{r, fig.align='center'}
-
+```{r, fig.align = 'center'}
+# see descriptions above 
 ratio_small <- 0.4
 
 # Reshape the data 
 data_long <- d %>%
-  filter(smaller_fraction==ratio_small) %>%
-  gather(key = "hypothesis", value = "value", starts_with("H")) %>%
-  filter(!is.na(value))
+ filter(smaller_fraction == ratio_small) %>%
+ gather(key = "hypothesis", value = "value", starts_with("H")) %>%
+ filter(!is.na(value))
 
 data_long_avg <- data_long %>%
-  group_by(N_tot, N_per_condition, N_countries, hypothesis) %>%
-  summarise(
-    se_value = binomSEM(value),
-    value = mean(value)
-  )
+ group_by(N_tot, N_per_condition, N_countries, hypothesis) %>%
+ summarise(
+ se_value = binomSEM(value), 
+ value = mean(value)
+ )
 
 # plot split according to number of countries 
-ggplot(data_long, aes(x = N_per_condition, y = value, color = as.factor(N_countries))) + 
-  geom_point(data=data_long_avg) +
-  geom_errorbar(data=data_long_avg, aes(ymin=value-se_value, ymax=value+se_value), width=0)+
-  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
-  facet_wrap(~hypothesis) +
-  labs(color = "N. countries", x="N participants per condition",y="power") +
-  geom_hline(yintercept=0.8, lty=2)+
-  geom_hline(yintercept=0.95, lty=3)+
-  coord_cartesian(ylim=c(0.5,1))+
-  theme_minimal()
+ggplot(data_long, aes(x = N_per_condition,
+                      y = value, color = as.factor(N_countries))) + 
+ geom_point(data = data_long_avg) + 
+ geom_errorbar(data = data_long_avg, 
+               aes(ymin = value-se_value, ymax = value + se_value), width = 0) + 
+ geom_smooth(method = "glm", 
+             method.args = list(family = "binomial"), se = FALSE) + 
+ facet_wrap(~hypothesis) + 
+ labs(color = "N. countries", x = "N participants per condition", y = "power") + 
+ geom_hline(yintercept = 0.8, lty = 2) + 
+ geom_hline(yintercept = 0.95, lty = 3) + 
+ coord_cartesian(ylim = c(0.5, 1)) + 
+ theme_minimal()
 
 # plot only as a function of number of participants
 data_long_avg2 <- data_long %>%
-  mutate(N_per_grouping = ratio_small* N_tot) %>%
-  group_by(N_per_grouping, hypothesis) %>%
-  summarise(
-    se_value = binomSEM(value),
-    value = mean(value)
-  )
+ mutate(N_per_grouping = ratio_small* N_tot) %>%
+ group_by(N_per_grouping, hypothesis) %>%
+ summarise(
+ se_value = binomSEM(value), 
+ value = mean(value)
+ )
 
 data_long <- data_long %>%
-  mutate(N_per_grouping = ratio_small* N_tot)
+ mutate(N_per_grouping = ratio_small* N_tot)
 
-ggplot(data_long, aes(x = N_per_grouping, y = value, color=hypothesis, group=hypothesis)) + 
-  geom_point(data=data_long_avg2) +
-  geom_errorbar(data=data_long_avg2, aes(ymin=value-se_value, ymax=value+se_value), width=0)+
-  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, n=500) +
-  labs(x="N participants in the cultural 'grouping' with less countries",y="power") +
-  geom_hline(yintercept=0.8, lty=2)+
-  geom_hline(yintercept=0.95, lty=3)+
-  coord_cartesian(ylim=c(0.6,1), xlim=c(1250, 5000))+
-  scale_x_continuous(breaks=seq(0, 10000, 250),guide = guide_axis(angle = 90))+
-  theme_minimal()
-
+ggplot(data_long, aes(x = N_per_grouping, 
+                      y = value, color = hypothesis, group = hypothesis)) + 
+ geom_point(data = data_long_avg2) + 
+ geom_errorbar(data = data_long_avg2, 
+               aes(ymin = value-se_value, ymax = value + se_value), width = 0) + 
+ geom_smooth(method = "glm", 
+             method.args = list(family = "binomial"), se = FALSE, n = 500) + 
+ labs(x = "N participants in the cultural 'grouping' with less countries", y = "power") + 
+ geom_hline(yintercept = 0.8, lty = 2) + 
+ geom_hline(yintercept = 0.95, lty = 3) + 
+ coord_cartesian(ylim = c(0.6, 1), xlim = c(1250, 5000)) + 
+ scale_x_continuous(breaks = seq(0, 10000, 250), 
+                    guide = guide_axis(angle = 90)) + 
+ theme_minimal()
 
 ## plot p(all inferences correct)
-d$value <- ifelse(d$H1a + d$H1b + d$H2a + d$H2b + d$H3a + d$H3b ==6,1,0)
+d$value <- ifelse(d$H1a + d$H1b + d$H2a + d$H2b + d$H3a + d$H3b == 6, 1, 0)
 
 data_avg2 <- d %>%
-  filter(smaller_fraction==ratio_small) %>%
-  group_by(N_tot) %>%
-  summarise(
-    se_value = mlisi::binomSEM(value),
-    value = mean(value)
-  )
+ filter(smaller_fraction == ratio_small) %>%
+ group_by(N_tot) %>%
+ summarise(
+ se_value = binomSEM(value), 
+ value = mean(value)
+ )
 
 d %>%
-  filter(smaller_fraction==ratio_small) %>%
-  ggplot(aes(x = N_tot, y = value)) +
-  geom_point(data=data_avg2) +
-  geom_errorbar(data=data_avg2, aes(ymin=value-se_value, ymax=value+se_value), width=0)+
-  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
-  geom_hline(yintercept=0.95, lty=2)+
-  geom_hline(yintercept=0.8, lty=3)+
-  coord_cartesian(ylim=c(0,1))+
-  labs(x="N total'",y="probability that all inferences are correct") +
-  theme_minimal()
-
+ filter(smaller_fraction == ratio_small) %>%
+ ggplot(aes(x = N_tot, y = value)) + 
+ geom_point(data = data_avg2) + 
+ geom_errorbar(data = data_avg2, 
+               aes(ymin = value-se_value, ymax = value + se_value), width = 0) + 
+ geom_smooth(method = "glm", 
+             method.args = list(family = "binomial"), se = FALSE) + 
+ geom_hline(yintercept = 0.95, lty = 2) + 
+ geom_hline(yintercept = 0.8, lty = 3) + 
+ coord_cartesian(ylim = c(0, 1)) + 
+ labs(x = "N total'", y = "probability that all inferences are correct") + 
+ theme_minimal()
 ```
 
 ### 70-30
 
-```{r, fig.align='center'}
-
+```{r, fig.align = 'center'}
 ratio_small <- 0.3
 
 # Reshape the data 
 data_long <- d %>%
-  filter(smaller_fraction==ratio_small) %>%
-  gather(key = "hypothesis", value = "value", starts_with("H")) %>%
-  filter(!is.na(value))
+ filter(smaller_fraction == ratio_small) %>%
+ gather(key = "hypothesis", value = "value", starts_with("H")) %>%
+ filter(!is.na(value))
 
 data_long_avg <- data_long %>%
-  group_by(N_tot, N_per_condition, N_countries, hypothesis) %>%
-  summarise(
-    se_value = binomSEM(value),
-    value = mean(value)
-  )
+ group_by(N_tot, N_per_condition, N_countries, hypothesis) %>%
+ summarise(
+ se_value = binomSEM(value), 
+ value = mean(value)
+ )
 
 # plot split according to number of countries 
-ggplot(data_long, aes(x = N_per_condition, y = value, color = as.factor(N_countries))) + 
-  geom_point(data=data_long_avg) +
-  geom_errorbar(data=data_long_avg, aes(ymin=value-se_value, ymax=value+se_value), width=0)+
-  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
-  facet_wrap(~hypothesis) +
-  labs(color = "N. countries", x="N participants per condition",y="power") +
-  geom_hline(yintercept=0.8, lty=2)+
-  geom_hline(yintercept=0.95, lty=3)+
-  coord_cartesian(ylim=c(0.5,1))+
-  theme_minimal()
+ggplot(data_long, aes(x = N_per_condition,
+                      y = value, color = as.factor(N_countries))) + 
+ geom_point(data = data_long_avg) + 
+ geom_errorbar(data = data_long_avg, 
+               aes(ymin = value-se_value, ymax = value + se_value), width = 0) + 
+ geom_smooth(method = "glm", 
+             method.args = list(family = "binomial"), se = FALSE) + 
+ facet_wrap(~hypothesis) + 
+ labs(color = "N. countries", x = "N participants per condition", y = "power") + 
+ geom_hline(yintercept = 0.8, lty = 2) + 
+ geom_hline(yintercept = 0.95, lty = 3) + 
+ coord_cartesian(ylim = c(0.5, 1)) + 
+ theme_minimal()
 
 # plot only as a function of number of participants
 data_long_avg2 <- data_long %>%
-  mutate(N_per_grouping = ratio_small* N_tot) %>%
-  group_by(N_per_grouping, hypothesis) %>%
-  summarise(
-    se_value = binomSEM(value),
-    value = mean(value)
-  )
+ mutate(N_per_grouping = ratio_small* N_tot) %>%
+ group_by(N_per_grouping, hypothesis) %>%
+ summarise(
+ se_value = binomSEM(value), 
+ value = mean(value)
+ )
 
 data_long <- data_long %>%
-  mutate(N_per_grouping = ratio_small* N_tot)
+ mutate(N_per_grouping = ratio_small* N_tot)
 
-ggplot(data_long, aes(x = N_per_grouping, y = value, color=hypothesis, group=hypothesis)) + 
-  geom_point(data=data_long_avg2) +
-  geom_errorbar(data=data_long_avg2, aes(ymin=value-se_value, ymax=value+se_value), width=0)+
-  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, n=500) +
-  labs(x="N participants in the cultural 'grouping' with less countries",y="power") +
-  geom_hline(yintercept=0.8, lty=2)+
-  geom_hline(yintercept=0.95, lty=3)+
-  coord_cartesian(ylim=c(0.6,1), xlim=c(1250, 5000))+
-  scale_x_continuous(breaks=seq(0, 10000, 250),guide = guide_axis(angle = 90))+
-  theme_minimal()
+ggplot(data_long, aes(x = N_per_grouping, 
+                      y = value, color = hypothesis, group = hypothesis)) + 
+ geom_point(data = data_long_avg2) + 
+ geom_errorbar(data = data_long_avg2, 
+               aes(ymin = value-se_value, ymax = value + se_value), width = 0) + 
+ geom_smooth(method = "glm",
+             method.args = list(family = "binomial"), se = FALSE, n = 500) + 
+ labs(x = "N participants in the cultural 'grouping' with less countries", y = "power") + 
+ geom_hline(yintercept = 0.8, lty = 2) + 
+ geom_hline(yintercept = 0.95, lty = 3) + 
+ coord_cartesian(ylim = c(0.6, 1), xlim = c(1250, 5000)) + 
+ scale_x_continuous(breaks = seq(0, 10000, 250), 
+                    guide = guide_axis(angle = 90)) + 
+ theme_minimal()
 
 
 ## plot p(all inferences correct)
-d$value <- ifelse(d$H1a + d$H1b + d$H2a + d$H2b + d$H3a + d$H3b ==6,1,0)
+d$value <- ifelse(d$H1a + d$H1b + d$H2a + d$H2b + d$H3a + d$H3b == 6, 1, 0)
 
 data_avg2 <- d %>%
-  filter(smaller_fraction==ratio_small) %>%
-  group_by(N_tot) %>%
-  summarise(
-    se_value = mlisi::binomSEM(value),
-    value = mean(value)
-  )
+ filter(smaller_fraction == ratio_small) %>%
+ group_by(N_tot) %>%
+ summarise(
+ se_value = binomSEM(value), 
+ value = mean(value)
+ )
 
 d %>%
-  filter(smaller_fraction==ratio_small) %>%
-  ggplot(aes(x = N_tot, y = value)) +
-  geom_point(data=data_avg2) +
-  geom_errorbar(data=data_avg2, aes(ymin=value-se_value, ymax=value+se_value), width=0)+
-  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE) +
-  geom_hline(yintercept=0.95, lty=2)+
-  geom_hline(yintercept=0.8, lty=3)+
-  coord_cartesian(ylim=c(0,1))+
-  labs(x="N total'",y="probability that all inferences are correct") +
-  theme_minimal()
-
+ filter(smaller_fraction == ratio_small) %>%
+ ggplot(aes(x = N_tot, y = value)) + 
+ geom_point(data = data_avg2) + 
+ geom_errorbar(data = data_avg2,
+               aes(ymin = value-se_value, ymax = value + se_value), width = 0) + 
+ geom_smooth(method = "glm", 
+             method.args = list(family = "binomial"), se = FALSE) + 
+ geom_hline(yintercept = 0.95, lty = 2) + 
+ geom_hline(yintercept = 0.8, lty = 3) + 
+ coord_cartesian(ylim = c(0, 1)) + 
+ labs(x = "N total'", y = "probability that all inferences are correct") + 
+ theme_minimal()
 ```
 
