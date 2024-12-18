@@ -1,0 +1,625 @@
+---
+title: "Analyses pilot 2"
+author: "Matteo Lisi"
+date: "`r Sys.Date()`"
+format: 
+  # docx:
+  #   number-sections: true
+  #   grid:
+  #     margin-width: 350px
+  html:
+    toc: true 
+    number-sections: true
+    grid:
+      margin-width: 350px
+  pdf:
+    toc: true 
+    documentclass: article
+    fontsize: 8pt
+    geometry: "left=1in, right=1in, top=1in, bottom=1in, marginparwidth=2in" 
+    include-in-header: 
+      text: |
+        \usepackage{unicode-math}
+        \setmainfont{DejaVu Sans}
+editor: source
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+```
+
+\newpage
+
+## Libraries
+
+```{r}
+#| message: FALSE
+library(lme4)
+library(kableExtra)
+library(tidyverse)
+library(patchwork)
+library(sjPlot)
+```
+
+## Data
+
+The dataset contain responses from a total of 101 participants
+
+```{r}
+#| message: FALSE
+d <- read_csv("ECFullPilot2.csv")
+nrow(d)
+```
+
+
+### Demographic summary
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+demographic_summary <- d %>%
+  summarise(
+    `Avearge age (Std.)` = sprintf("%.2f (%.2f)", mean(Age, na.rm = TRUE), sd(Age, na.rm = TRUE)),
+    `Age Range` = paste(min(Age, na.rm = TRUE), "to", max(Age, na.rm = TRUE)),
+    `N. males (Gender = 1)` = sprintf("%i", sum(Gender == 1, na.rm = TRUE)),
+    `N. female (Gender = 2)` = sprintf("%i", sum(Gender == 2, na.rm = TRUE)),
+    `N. non binary (Gender = 3)` = sprintf("%i", sum(Gender == 3, na.rm = TRUE))
+  ) %>%
+  pivot_longer(everything(), names_to = "Demographic", values_to = "Value") 
+
+knitr::kable(demographic_summary, booktabs = TRUE, 
+             caption = "Demographic Information of Participants", 
+             col.names = c("Demographic", "Value"))%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+
+### Exclusions
+
+
+```{r, echo=FALSE}
+total_initial <- nrow(d)
+
+# Status == 0
+excluded_status <- total_initial - nrow(d %>% filter(Status == 0))
+remaining_after_status <- nrow(d %>% filter(Status == 0))
+
+
+# Finished == 1
+excluded_finished <- remaining_after_status - nrow(d %>% filter(Status == 0, 
+                                                                Finished == 1))
+
+remaining_after_finished <- nrow(d %>% filter(Status == 0, 
+                                              Finished == 1))
+
+# Q_RecaptchaScore > 0.5
+excluded_recaptcha <- remaining_after_finished - nrow(d %>% filter(Status == 0, 
+                                                                   Finished == 1, 
+                                                                   Progress >= 99, 
+                                                                   Q_RecaptchaScore >= 0.5))
+remaining_after_recaptcha <- nrow(d %>% filter(Status == 0, 
+                                               Finished == 1, 
+                                               Progress >= 99, 
+                                               Q_RecaptchaScore >= 0.5))
+
+# attention check
+excluded_attcheck <- remaining_after_recaptcha - nrow(d %>% filter(Status == 0, 
+                                                                   Finished == 1, 
+                                                                   Progress >= 99, 
+                                                                   Q_RecaptchaScore >= 0.5,
+                                                                   check==1))
+remaining_after_attcheck <- nrow(d %>% filter(Status == 0, 
+                                               Finished == 1, 
+                                               Progress >= 99, 
+                                               Q_RecaptchaScore >= 0.5,
+                                               check==1))
+
+
+# Total number of participants excluded (excluded because they fail at least 1 criterion)
+total_excluded <- total_initial - remaining_after_attcheck
+
+# Create summary table
+summary_table <- data.frame(
+  Criterion = c( "Status == 0",
+                 "Finished == 1", 
+                 "Q_RecaptchaScore >= 0.5", 
+                 "failed attention check",
+                 "Total"),
+  Excluded = c(excluded_status, 
+               excluded_finished, 
+               excluded_recaptcha, 
+               excluded_attcheck,
+               total_excluded),
+  Fraction = c(excluded_status/total_initial, 
+               excluded_finished/total_initial, 
+               excluded_recaptcha/total_initial, 
+               excluded_attcheck/total_initial,
+               total_excluded/total_initial),
+  
+  Percentage = c(excluded_status/total_initial * 100, 
+                 excluded_finished/total_initial * 100, 
+                 excluded_recaptcha/total_initial * 100, 
+                 excluded_attcheck/total_initial * 100,
+                 total_excluded/total_initial * 100)
+)
+
+# Print the summary table as an HTML table
+kable(summary_table, booktabs = TRUE, 
+      col.names = c("Exclusion Criterion", 
+                    "Number Excluded", 
+                    "Fraction Excluded", 
+                    "Percentage Excluded"), 
+      caption="Each line indicates how many participants failed each criterion (applied sequentially).") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+
+```{r, echo=FALSE}
+d <- d %>% 
+  filter(Consent == 1, 
+         Progress >= 99, 
+         Finished == 1, 
+         Status == 0, 
+         Q_RecaptchaScore >= 0.5)
+```
+
+
+\newpage
+
+### Use of external resources
+
+AS shown below, this was generally low, and there seems to be not much difference between conditions.
+
+```{r, echo=FALSE}
+d %>%
+  mutate(participant = row_number(),
+         condition = case_when(
+    feedback=="F" & justification == "NJ"~ "feedback",
+    justification == "J" & feedback=="NF"~ "justification",
+    justification == "J" & feedback=="F"~ "feedback + justification",
+    .default = "baseline"
+  )) %>%
+  select(starts_with("ext_resources"),condition) %>%
+  pivot_longer(cols = starts_with("ext_resources"),
+               names_to = "CRT", 
+               values_to = "ext_resources",
+               values_drop_na = TRUE) %>%
+  group_by(condition) %>%
+  summarise(`%` = round(100*mean(ext_resources, na.rm=TRUE),digits=2),
+            N = sum(ext_resources, na.rm=TRUE)) %>%
+  knitr::kable(booktabs = TRUE, caption = "Percentage and number of responses (pooled over participants) reporting use of external resources split by condition.")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+
+
+```
+
+```{r, echo=FALSE}
+ext_d <- d %>%
+  mutate(participant = row_number(),
+         condition = case_when(
+    feedback=="F" & justification == "NJ"~ "feedback",
+    justification == "J" & feedback=="NF"~ "justification",
+    justification == "J" & feedback=="F"~ "feedback + justification",
+    .default = "baseline"
+  )) %>%
+  select(starts_with("ext_resources"),condition, participant) %>%
+  pivot_longer(cols = starts_with("ext_resources"),
+               names_to = "CRT", 
+               values_to = "ext_resources",
+               values_drop_na = TRUE)
+
+m_ext <- glmer(ext_resources ~ condition + (1|CRT) + (1|participant), family=binomial("logit"), ext_d)
+tab_model(m_ext, transform=NULL, show.icc=FALSE, show.r2=FALSE)
+#summary(m_ext)
+```
+
+
+## Familiarity
+
+A large fraction of participants reported familiarity with some of the CRT problems:
+
+```{r, echo=FALSE}
+d %>%
+  mutate(participant = row_number(),
+         condition = case_when(
+    feedback=="F" & justification == "NJ"~ "feedback",
+    justification == "J" & feedback=="NF"~ "justification",
+    justification == "J" & feedback=="F"~ "feedback + justification",
+    .default = "baseline"
+  )) %>%
+  select(starts_with("familiarity"),condition) %>%
+  pivot_longer(cols = starts_with("familiarity"),
+               names_to = "CRT", 
+               values_to = "familiarity",
+               values_drop_na = TRUE) %>%
+  mutate(CRT = sub(".*_(\\d+)$", "\\1", CRT)) %>% # just polish name
+  group_by(CRT) %>%
+  summarise(`%` = round(100*mean(familiarity, na.rm=TRUE),digits=2),
+            N = sum(familiarity, na.rm=TRUE)) %>%
+  knitr::kable(booktabs = TRUE, caption = "Percentage and number of people reporting familiarity split by CRT item.")%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+
+
+```
+
+
+```{r, echo=FALSE}
+prop_fam <- d %>%
+     mutate(participant = row_number(),
+            condition = case_when(
+                feedback=="F" & justification == "NJ"~ "feedback",
+                justification == "J" & feedback=="NF"~ "justification",
+                justification == "J" & feedback=="F"~ "feedback + justification",
+                .default = "baseline"
+            )) %>%
+     select(starts_with("familiarity"),condition) %>%
+     pivot_longer(cols = starts_with("familiarity"),
+                  names_to = "CRT",
+                  values_to = "familiarity",
+                  values_drop_na = TRUE) %>%
+     mutate(CRT = sub(".*_(\\d+)$", "\\1", CRT)) %>% pull(familiarity) %>% mean(.,na.rm=TRUE)
+
+prop_fam <- round(prop_fam*100, digits=2)
+```
+
+
+
+\newpage
+
+## Data transformation
+
+We transform the data into a long format:
+
+```{r}
+d_crt_long <- d %>%
+  mutate(participant = row_number()) %>% # Add participant ID
+  # ID + cols matching 'crt#_i' or 'crt#_r'
+  select(participant, justification, feedback, matches('^crt[1-6]_[ir]$')) %>% 
+  pivot_longer(
+    cols = matches('^crt[1-6]_[ir]$'),
+    names_to = 'item',
+    values_to = 'response'
+  ) %>%
+  extract( # Extract 'problem' number and 'condition' from 'item'
+    item, 
+    into = c('crt', 'problem', 'condition'),
+    regex = '(crt)([1-6])_([ir])'
+  ) %>%
+  mutate(
+    problem = as.integer(problem),
+    condition = recode(condition, 'i' = 'intuitive', 'r' = 'reflexive')
+  ) %>%
+  select(participant, problem, condition, response, justification, feedback)
+
+# Pivot familiarity data (one value per participant-problem)
+d_fam_long <- d %>%
+  mutate(participant = row_number()) %>%
+  pivot_longer(
+    cols = matches("^familiarity_[1-6]$"),
+    names_to = "fam_item",
+    values_to = "familiarity"
+  ) %>%
+  mutate(problem = as.integer(str_extract(fam_item, "[1-6]"))) %>%
+  select(participant, problem, familiarity)
+
+# Pivot ext_resources_use data (one value per participant-problem)
+d_ext_long <- d %>%
+  mutate(participant = row_number()) %>%
+  pivot_longer(
+    cols = matches("^ext_resources_use_[1-6]$"),
+    names_to = "ext_item",
+    values_to = "ext_resources_use"
+  ) %>%
+  mutate(problem = as.integer(str_extract(ext_item, "[1-6]"))) %>%
+  select(participant, problem, ext_resources_use)
+
+# Pivot dot_crt responses (one value per participant-problem)
+d_dot_long <- d %>%
+  mutate(participant = row_number()) %>%
+  pivot_longer(
+    cols = matches("^dot_crt[1-6]$"),
+    names_to = "dot_item",
+    values_to = "dot_response"
+  ) %>%
+  mutate(problem = as.integer(str_extract(dot_item, "[1-6]"))) %>%
+  select(participant, problem, dot_response)
+
+# correct answers to dot problems (double checked on Qualtrics) 
+dot_correct <- c(3,2,4,2,1, 3)
+d_dot_long <- d_dot_long %>%
+  mutate(dot_accuracy = ifelse(dot_response==dot_correct[d_dot_long$problem], 1, 0))
+
+# Join everything together
+d_long <- d_crt_long %>%
+  left_join(d_fam_long, by = c("participant","problem")) %>%
+  left_join(d_ext_long, by = c("participant","problem")) %>%
+  left_join(d_dot_long, by = c("participant","problem")) %>%
+  # Now each (participant, problem) has two rows (for each phase),
+  # and familiarity and ext_resources_use are duplicated for both.
+  select(participant, response, justification, feedback, problem, 
+         condition, problem, familiarity, ext_resources_use, dot_accuracy)
+
+# check output
+str(d_long)
+```
+
+Next we add response accuracy (the response option "1" was always the correct one)
+
+```{r}
+# change any -99 to NA
+d_long$response <- ifelse(d_long$response==-99, NA, d_long$response)
+
+# compute accuracy
+d_long$accuracy <- ifelse(!is.na(d_long$response), 
+                       ifelse(d_long$response==1,1,0),
+                       d_long$response)
+```
+
+
+### Dot accuracy (concurrent memory task in the intuitive phase 1)
+
+We can check the accuracy of responses to the dot task in the intuitive phase
+
+```{r}
+mean(d_long$dot_accuracy)
+with(d_long, tapply(dot_accuracy, problem, mean))
+```
+
+
+
+\newpage
+
+### Prepare data for modelling
+
+In order to enter the data in the models specified as in the pre-registration, we need some additional steps. We first transform the data such that the responses in the two phases are on distinct columns:
+
+```{r}
+d_all <- d_long %>%
+  pivot_wider(
+    names_from = condition,
+    values_from = c(response, accuracy),
+    names_sep = "_")
+str(d_all)
+```
+### Apply exclusions
+
+This is a good time to also exclude responses to problems in which participants declared consulting external resources (this will remove both phase 1 and phase 2 responses).
+
+```{r}
+d_all <- d_all[d_all$ext_resources_use==0,]
+```
+
+We can also apply the exclusion criteria based on the accuracy of the dot task
+
+```{r}
+d_all <- d_all[d_all$dot_accuracy==1,]
+```
+
+
+After excluding responses based on use of external resources & failed concurrent memory (dot) task, exclusion based on familiarity will exclude a further `r round(mean(d_all$familiarity==1)*100, digits=2)` % of total responses)
+
+If instead we excluded responses with self-reported familiarity AND a correct answer in either intuitive or reflexive phase we would exclude `r with(d_all, round(mean(familiarity==1 & (accuracy_intuitive==1|accuracy_reflexive==1))*100, digits=2))` % of responses. Alternatively, if we excluded responses with self-reported familiarity AND correct answer in BOTH intuitive or reflexive phase, we would have `r with(d_all, round(mean(familiarity==1 & accuracy_intuitive==1 & accuracy_reflexive==1, na.rm=TRUE)*100, digits=2))` % responses excluded.
+
+
+
+Although it exclude a substantial fraction of data, we proceed applying the exclusion criteria as in the preregistration draft (i.e. by excluding all responses with self-reported familiarity)
+
+```{r}
+d_all <- d_all[d_all$familiarity==0,]
+```
+
+
+\pagebreak
+
+### Compute dependent variables for specific hypotheses
+
+For Hypothesis 1 ( _"less than half of correct answers will arise from error correction during deliberation"_ )  we restrict analyses to all correct responses, and examine the proportion of correct responses made in phase 2 out of all correct responses:
+
+```{r}
+dat_H1 <- d_all %>%
+  filter(accuracy_intuitive == 1 | accuracy_reflexive == 1) %>% # keep only correct, either at phase 1 or 2
+  filter(!is.na(accuracy_intuitive)) %>% # excluded missing responses in phase 1
+  mutate(correct_phase2 = ifelse(accuracy_intuitive == 0, accuracy_reflexive, 0)) %>%
+  select(correct_phase2, participant, problem, justification, feedback)
+str(dat_H1)
+```
+
+*Note that from the dataset for H1 I am excluding missing phase 1 responses. This is because we cannot know whether participant would have responded correctly or not in phase 1 for those problems.*
+
+The remaining hypotheses concern the probability intuitive incorrect answers (errors in phase 1) are corrected in the reflexive phase (phase 2). These hypotheses are not relevant for the pilot since we have only 1 condition. We can still use this data to estimate the probability of correction in the baseline condition.
+
+```{r}
+# The other hypotheses 
+dat_Hother <- d_all %>%
+  filter(accuracy_intuitive == 0) %>% # keep only intuitive errors
+  mutate(corrected = accuracy_reflexive) %>%
+  select(corrected, participant, problem, justification, feedback)
+```
+
+
+\newpage
+
+## Data summaries
+
+### Accuracy
+
+Proportion of correct responses split by item and phase:
+
+```{r, echo=FALSE, warning=FALSE}
+mean_accuracy_table <- d_all %>%
+  filter(!is.na(accuracy_intuitive))  %>%
+  group_by(justification, feedback, problem) %>%
+  summarise(intuitive = mean(accuracy_intuitive),
+            reflexive = mean(accuracy_reflexive))
+
+knitr::kable(mean_accuracy_table,
+             booktabs = TRUE, 
+             caption = "Mean accuracy by CRT problem and phase (here 'intuitive' is phase 1 and 'reflexive' is phase 2)",
+             digits=2) %>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+
+### Missing responses
+
+The number of missing responses is much lower compared to the first pilot
+
+```{r, echo=FALSE}
+missing_table <- d_long %>%
+  filter(condition=="intuitive") %>%
+  group_by(problem) %>%
+  summarize(prop_missing = mean(is.na(response)),
+            N_missing = sum(is.na(response))) 
+
+knitr::kable(missing_table,
+             booktabs = TRUE, 
+             caption = "Proportion and number of missing responses in phase 1 (intuitive)",
+             digits=2) %>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+\newpage
+
+### Responses correct in phase 1 and turned into errors in phase 2
+
+Using the data transformed as in the object `d_all` above we can easily check how frequently participants made a correct response in phase 1, and changed it into an error in phase 2. The table below shows how many times this occurred for each CRT problem:
+
+```{r}
+correct2error_table <- d_all %>%
+  filter(accuracy_intuitive == 1 | accuracy_reflexive == 1) %>%
+  select(accuracy_intuitive,accuracy_reflexive, problem) %>%
+  filter(accuracy_reflexive==0) %>%
+  group_by(problem) %>%
+  summarise(N = sum(accuracy_intuitive))
+
+print(correct2error_table)
+```
+
+Overall across all problems this occurred `r sum(correct2error_table$N)` times.
+
+\newpage
+
+### Confidence calibration
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "Number of correct answer (vertical coordinates) plotted as a function of the answer to the calibration responses (e.g. the participant's estimates of their own accuracy; horizontal coordinates). Some jitter added for visibility. Both plots demonstrates substantial over-confidence, since in both cases most points lie below the identity line."
+#| label: fig-calibration
+
+tab_correct <- d_all %>%
+  group_by(participant) %>%
+  summarise(accuracy_intuitive = sum(accuracy_intuitive, na.rm=T),
+            accuracy_reflexive = sum(accuracy_reflexive, na.rm=T))
+
+tab_calib <- d %>%
+  mutate(participant = row_number()) %>%
+  select(calib_int, calib_ref, participant) %>%
+  merge(., tab_correct, by="participant")
+
+p1 <- tab_calib %>%
+  ggplot(aes(x=calib_int, y=accuracy_intuitive)) +
+  geom_abline(intercept=0, slope=1, lty=2)+
+  geom_jitter(width=0.125, height=0.125, pch=21)+
+  coord_equal(xlim=c(0,6), ylim=c(0,6))+
+  ggtitle("Intuitive phase")
+
+p2 <- tab_calib %>%
+  ggplot(aes(x=calib_ref, y=accuracy_reflexive)) +
+  geom_abline(intercept=0, slope=1, lty=2)+
+  geom_jitter(width=0.125, height=0.125, pch=21)+
+  coord_equal(xlim=c(0,6), ylim=c(0,6))+
+  ggtitle("Reflexive phase")
+
+p1 + p2
+```
+
+
+
+\newpage
+
+## Analyses
+
+Recode justification and feedback as dummy variables 
+
+```{r}
+dat_H1$justification <- ifelse(dat_H1$justification=="J", 1, 0)
+dat_H1$feedback <- ifelse(dat_H1$feedback=="F", 1, 0)
+
+dat_Hother$justification <- ifelse(dat_Hother$justification=="J", 1, 0)
+dat_Hother$feedback <- ifelse(dat_Hother$feedback=="F", 1, 0)
+```
+
+
+### H1
+
+For the pilot we use `glm` instead of `glmer` since there is not geopolitcal region to group random effects as pre-registered.
+
+```{r}
+mH1_p <- glm(correct_phase2 ~ feedback * justification, family = binomial("logit"), data=dat_H1)
+summary(mH1_p)
+```
+
+The model indicate that out of all correct responses, the proportion of correct responses made in the reflective phase is actually greater than 50% in the baseline condition (although not significant), thus contrary to the hypothesis. It can be computed by transforming the intercept parameter from log-odds to probability:
+
+```{r}
+exp(coef(mH1_p)['(Intercept)'])/(1+exp(coef(mH1_p)['(Intercept)']))
+```
+
+
+```{r}
+H1_CI <- confint(mH1_p)
+exp(H1_CI[1,])/(1+exp(H1_CI[1,]))
+```
+
+
+We can use `glmer` for the robustness check with random intercepts grouped by CRT problem:
+
+```{r}
+mH1_mm <- glmer(correct_phase2 ~ feedback * justification + (1|problem), family = binomial("logit"), data=dat_H1)
+summary(mH1_mm)
+```
+
+\newpage
+
+### Probability of correction
+
+
+```{r}
+mHx_p <- glm(corrected ~ feedback * justification, family = binomial("logit"), data=dat_Hother)
+summary(mHx_p)
+```
+
+The probability of correction (i.e. that an error in the intuitive phase is corrected in the deliberative phase) in the baseline condition is
+
+```{r}
+beta <- coef(mHx_p)
+exp(beta[1]) / (1 + exp(beta[1]))
+```
+
+It increases to over 50% in both feedback and justification condition:
+
+```{r}
+
+exp(beta[1] + beta[2:3]) / (1 + exp(beta[1] + beta[2:3]))
+
+```
+
+It does not increase more in the combined feedback + justification condition:
+
+```{r}
+
+exp(sum(beta)) / (1 + exp(sum(beta)))
+
+```
+
+
+Additional model with random intercept for CRT problem:
+
+```{r}
+mHx_mm <- glmer(corrected ~ feedback * justification + (1|problem) + (1|participant), family = binomial("logit"), data=dat_Hother)
+summary(mHx_mm)
+```
+
+
