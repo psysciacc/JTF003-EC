@@ -1,0 +1,2664 @@
+---
+title: "JTF003-EC — Initial analysis report"
+date: "`r Sys.Date()`"
+format: 
+  # docx:
+  #   number-sections: true
+  #   grid:
+  #     margin-width: 350px
+  html:
+    toc: true 
+    number-sections: true
+    grid:
+      margin-width: 350px
+  pdf:
+    toc: true 
+    documentclass: article
+    fontsize: 8pt
+    geometry: "left=1in, right=1in, top=1in, bottom=1in, marginparwidth=2in" 
+    include-in-header: 
+      text: |
+        \usepackage{unicode-math}
+        \setmainfont{DejaVu Sans}
+editor: source
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+```
+
+\newpage
+
+## Libraries
+
+```{r}
+#| message: FALSE
+library(lme4)
+library(kableExtra)
+library(tidyverse)
+library(patchwork)
+library(sjPlot)
+library(gt)
+```
+
+
+```{r, echo=FALSE}
+ml_theme <- function(base_size = 9, base_family = "Helvetica") {
+  theme_bw(
+    base_size = base_size,
+    base_family = base_family
+  ) +
+    theme(
+      text = element_text(
+        family = base_family,
+        size = base_size
+      ),
+
+      panel.border = element_blank(),
+
+      strip.background = element_rect(
+        fill = "white",
+        colour = NA
+      ),
+      strip.text = element_text(
+        size = rel(0.8)
+      ),
+
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor = element_blank(),
+
+      axis.line = element_line(
+        linewidth = 0.4
+      ),
+      axis.text.x = element_text(
+        size = 7,
+        colour = "black"
+      ),
+      axis.text.y = element_text(
+        size = 7,
+        colour = "black"
+      ),
+      axis.ticks = element_line(
+        colour = "black"
+      )
+    )
+}
+```
+
+
+## Data
+
+The data is already been cleaned of `Test` responses
+
+
+```{r}
+d <- read_csv("all_withNorway_noTest_countryFill_raw.csv")
+
+```
+
+
+However, a couple more issues needs to be checked.
+
+### Bilendi issues
+
+> Bilendi specific: 
+>  -	For the following Bilendi data collection, only the cases labelled as “Complete” are “validated” (paid). They passed the attention check and completed > the study fully 
+>  -	Complete indicates if they are paid or not for this sample 
+>  -	Remember that we use a time requirement [like took it “too fast”] Zimbabwe and South Africa had less questions and then Egypt and Kuwait had a few questions removed .
+> For the Zimbabwe, South Africa and Cameroon samples, we have removed the following 38 questions on the 31/05, before collecting more data (Note: So these participants should not be excluded based on non-completion because they did not have these measures.). The measures that were excluded are the following: 
+>  ●	Conspiracy scale (6 questions)
+>  ●	Actively open-minded thinking (14 questions)
+>  ●	Intellectual Humility (10 Questions)
+>  ●	Centrality of Religiosity Scale (8 Questions)
+
+However, I have checked and it does not seem that the 31/05 is a sharp transition?
+
+
+A different approach is to check the demographics questions that were asked at the end, and use them as evidence for completion?
+
+```{r}
+# All demographic variables, primarily for inspection
+demographic_vars <- c(
+  "Age",
+  "Gender", "Gender_4_TEXT",
+  "Edu",
+  paste0("Employment_", 1:8),
+  "Employment_-999",
+  "Employment_8_TEXT",
+  "Student",
+  "Religion",
+  "Religion_spec",
+  "Religion_spec_8_TEXT",
+  "Country_Ori_YN",
+  "Country_Ori",
+  "Country_Res_YN",
+  "Country_Res",
+  "native_lang",
+  "lang_fluency"
+)
+
+# Early demographic questions: evidence that the participant
+# at least started the demographic section
+early_demo_vars <- c(
+  "Age",
+  "Gender",
+  "Edu"
+)
+
+# Late demographic questions: stronger evidence that the participant
+# reached the end of the survey
+late_demo_vars <- c(
+  "Country_Ori_YN",
+  "Country_Res_YN",
+  "native_lang",
+  "lang_fluency"
+)
+
+
+# Diagnostic table
+bilendi_completion_check <- d %>%
+  mutate(
+    across(
+      any_of(demographic_vars),
+      ~ if (is.character(.x)) na_if(trimws(.x), "") else .x)) %>%
+  mutate(
+    n_early_demo_answered = rowSums(
+      !is.na(across(all_of(early_demo_vars)))
+    ),
+
+    n_late_demo_answered = rowSums(
+      !is.na(across(all_of(late_demo_vars)))
+    ),
+
+    # At least one of Age, Gender, or Education was answered
+    started_demographics = n_early_demo_answered > 0,
+
+    # At least one of the final demographic questions was answered
+    reached_end_demographics = n_late_demo_answered > 0
+  )
+```
+
+From the summary below we see that there are a number of participants in the Bilendi data (identified with `fetch_id==4`) who are not marked as Finished, but who reached the end of demographic questions:
+
+```{r}
+bilendi_completion_check %>%
+  filter(fetch_id == 4) %>%
+  count(
+    Finished,
+    started_demographics,
+    reached_end_demographics,
+    name = "N"
+  ) %>%
+  arrange(
+    Finished,
+    desc(reached_end_demographics),
+    desc(started_demographics)
+  )
+```
+
+We can correct these
+
+```{r}
+d <- bilendi_completion_check %>%
+  mutate(
+    Finished_original = Finished,
+
+    Finished_corrected = case_when(
+      fetch_id == 4 &
+        !coalesce(Finished, FALSE) &
+        reached_end_demographics ~ TRUE,
+
+      TRUE ~ coalesce(Finished, FALSE)
+    )
+  )
+
+# check how many have Finished status changed
+d %>%
+  count(
+    Finished_original,
+    Finished_corrected,
+    name = "N"
+  )
+```
+
+
+
+<!-- ### Country (mis)match -->
+
+<!-- Before excluding, I check that participants did not accidentally answered "No" to country of residence, then filled in with the country in which their data was collected (as these should not be excluded). -->
+
+<!-- ```{r} -->
+<!-- library(countrycode) -->
+
+<!-- clean_country_name <- function(x) { -->
+<!--   x <- as.character(x) -->
+<!--   x <- str_squish(x) -->
+<!--   x <- na_if(x, "") -->
+<!--   x <- na_if(x, "NA") -->
+<!--   x <- na_if(x, "Prefer not to respond") -->
+<!--   x -->
+<!-- } -->
+
+<!-- country_name_to_code <- function(x) { -->
+<!--   x_clean <- clean_country_name(x) -->
+
+<!--   manual_lookup <- c( -->
+<!--     "United Kingdom" = "UK", -->
+<!--     "United States of America" = "US", -->
+<!--     "Hong Kong (SAR)" = "HK", -->
+<!--     "Russian Federation" = "RU", -->
+<!--     "North Macedonia" = "MK", -->
+<!--     "Türkiye" = "TR" -->
+<!--   ) -->
+
+<!--   manual <- unname(manual_lookup[x_clean]) -->
+
+<!--   cc <- countrycode( -->
+<!--     x_clean, -->
+<!--     origin = "country.name", -->
+<!--     destination = "iso2c", -->
+<!--     warn = FALSE -->
+<!--   ) -->
+
+<!--   out <- if_else(!is.na(manual), manual, cc) -->
+<!--   clean_country_code(out) -->
+<!-- } -->
+
+<!-- d$Country_Res_code <- country_name_to_code(d$Country_Res) -->
+
+<!-- d <- d %>% -->
+<!--   mutate( -->
+<!--     Country_Res_YN_original = Country_Res_YN, -->
+
+<!--     country_res_match = -->
+<!--       !is.na(Country_Res_code) & -->
+<!--       !is.na(Country) & -->
+<!--       Country_Res_code == Country, -->
+
+<!--     Country_Res_YN = case_when( -->
+<!--       Country_Res_YN == "No" & country_res_match ~ "Yes", -->
+<!--       TRUE ~ Country_Res_YN -->
+<!--     ) -->
+<!--   ) -->
+
+<!-- d %>% -->
+<!--   filter( -->
+<!--     Country_Res_YN == "No", -->
+<!--     Country_Res_code == Country -->
+<!--   ) %>% -->
+<!--   select( -->
+<!--     ResponseId, -->
+<!--     Country, -->
+<!--     Country_Res_YN, -->
+<!--     Country_Res, -->
+<!--     Country_Res_code -->
+<!--   ) -->
+
+<!-- ``` -->
+
+
+
+\newpage
+
+### Exclusions
+
+Exclusion criteria as stated in the [preregistration](https://osf.io/preprints/psyarxiv/wegc5_v1):
+
+> We will exclude participants who did not complete the study, failed an attention check question, failed to pass the Captcha test (i.e., their Captcha score is equal to or lower than 0.5), or are not permanent residents of the geopolitical region where data collection is taking place.
+
+
+```{r, echo=FALSE}
+total_initial <- nrow(d)
+
+# Finished == 1
+excluded_finished <- total_initial  - nrow(d %>% filter(Finished_corrected == TRUE))
+remaining_after_finished <- nrow(d %>% filter(Finished_corrected == TRUE))
+
+# Matteo note: following prereg literally, but could make sense to look instead at Progress >= ** to include some partial responses
+
+# Q_RecaptchaScore > 0.5
+excluded_recaptcha <- remaining_after_finished - nrow(d %>% filter(Finished_corrected == TRUE, 
+                                                                   Q_RecaptchaScore >= 0.5))
+remaining_after_recaptcha <- nrow(d %>% filter(Finished == 1, 
+                                               Q_RecaptchaScore >= 0.5))
+
+# attention check
+excluded_attcheck <- remaining_after_recaptcha - nrow(d %>% filter(Finished_corrected == TRUE, 
+                                                                   Q_RecaptchaScore >= 0.5,
+                                                                   check==0))
+remaining_after_attcheck <- nrow(d %>% filter(Finished_corrected == TRUE, 
+                                               Q_RecaptchaScore >= 0.5,
+                                               check==0))
+
+# country of residence
+excluded_residence <- remaining_after_attcheck - nrow(d %>% filter(Finished_corrected == TRUE, 
+                                                                   Q_RecaptchaScore >= 0.5,
+                                                                   check==0,
+                                                                   Country_Res_YN =="Yes"))
+remaining_after_residence <- nrow(d %>% filter(Finished_corrected == TRUE, 
+                                               Q_RecaptchaScore >= 0.5,
+                                               check==0,
+                                               Country_Res_YN =="Yes"))
+
+# Total number of participants excluded (excluded because they fail at least 1 criterion)
+total_excluded <- total_initial - remaining_after_attcheck
+
+# Create summary table
+summary_table <- data.frame(
+  Criterion = c( "Finished == 1", 
+                 "Q_RecaptchaScore >= 0.5", 
+                 "attention check == 0",
+                 "Country_Res_YN == Yes",
+                 "Total"),
+  Excluded = c(excluded_finished, 
+               excluded_recaptcha, 
+               excluded_attcheck,
+               excluded_residence,
+               total_excluded),
+  Fraction = c(excluded_finished/total_initial, 
+               excluded_recaptcha/total_initial, 
+               excluded_attcheck/total_initial,
+               excluded_residence/total_initial, 
+               total_excluded/total_initial),
+  Percentage = c(excluded_finished/total_initial * 100, 
+                 excluded_recaptcha/total_initial * 100, 
+                 excluded_attcheck/total_initial * 100,
+                 excluded_residence/total_initial * 100, 
+                 total_excluded/total_initial * 100)
+)
+
+# Print the summary table as an HTML table
+kable(summary_table, booktabs = TRUE, 
+      col.names = c("Exclusion Criterion", 
+                    "Number Excluded", 
+                    "Fraction Excluded", 
+                    "Percentage Excluded"), 
+      caption="Each line indicates how many participants failed each criterion (applied sequentially).") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+The incomplete response have quite a wide range of progress levels
+
+```{r}
+#| echo: TRUE
+#| fig-width: 4
+#| fig-height: 4
+#| fig-align: 'center'
+
+hist(d$Progress[d$Finished!=1], xlim=c(0,100))
+```
+
+
+
+
+
+
+```{r, echo=FALSE}
+d <- d %>%
+  filter(Finished_corrected == TRUE,
+         check == 0,
+         Q_RecaptchaScore >= 0.5,
+         Country_Res_YN =="Yes")
+```
+
+
+### Countries/regions & collectivistic/individualistic categorisation
+
+
+```{r, echo=FALSE}
+# Expand country names
+d <- d %>%
+  mutate(Country = recode(Country,
+                          "AU" = "Australia",
+                          "AT" = "Austria",
+                          "AL" = "Albania",
+                          "BD" = "Bangladesh",
+                          "BA" = "Bosnia-Herzegovina",
+                          "BE" = "Belgium", 
+                          "BR" = "Brazil",
+                          "BG" = "Bulgaria",
+                          "CM" = "Cameroon",
+                          "CA" = "Canada",
+                          "CL" = "Chile",
+                          "CN" = "China",
+                          "CO" = "Colombia",
+                          "HR" = "Croatia",
+                          "CY" = "Cyprus",
+                          "CZ" = "Czech Republic",
+                          "DK" = "Denmark",
+                          "EC" = "Ecuador",
+                          "EG" = "Egypt",
+                          "ET" = "Ethiopia",
+                          "FR" = "France",
+                          "GE" = "Georgia",
+                          "DE" = "Germany",
+                          "GH" = "Ghana",
+                          "GR" = "Greece",
+                          "HK,HK" = "Hong Kong",
+                          "HK" = "Hong Kong",
+                          "HU" = "Hungary",
+                          "IN" = "India",
+                          "ID" = "Indonesia",
+                          "IR" = "Iran",
+                          "IQ" = "Iraq",
+                          "IL" = "Israel",
+                          "IT" = "Italy",
+                          "|T" = "Italy",
+                          "JP" = "Japan",
+                          "KZ" = "Kazakhstan",
+                          "KE" = "Kenya",
+                          "XK" = "Kosovo",
+                          "KW" = "Kuwait",
+                          "LV" = "Latvia",
+                          "LB" = "Lebanon",
+                          "MY" = "Malaysia",
+                          "MX" = "Mexico",
+                          "MA" = "Morocco",
+                          "NA" = "Namibia",
+                          "NZ" = "New Zealand",
+                          "NG" = "Nigeria",
+                          "MK" = "North Macedonia",
+                          "NO" = "Norway",
+                          "PK" = "Pakistan",
+                          "PH" = "Philippines",
+                          "PH,PH" = "Philippines",
+                          "PL" = "Poland",
+                          "PT" = "Portugal",
+                          "RO" = "Romania",
+                          "RU" = "Russia",
+                          "SA" = "Saudi Arabia",
+                          "RS" = "Serbia",
+                          "SG" = "Singapore",
+                          "SL" = "Sierra Leone",
+                          "SK" = "Slovakia",
+                          "ZA" = "South Africa",
+                          "KR" = "South Korea",
+                          "ES" = "Spain",
+                          "CH" = "Switzerland",
+                          "TW" = "Taiwan",
+                          "TH" = "Thailand",
+                          "NL" = "Netherlands",
+                          "TT" = "Trinidad & Tobago",
+                          "TR" = "Turkey",
+                          "UA" = "Ukraine",
+                          "AE" = "United Arab Emirates",
+                          "UK" = "United Kingdom",
+                          "US" = "United States",
+                          "UZ" = "Uzbekistan",
+                          "VN" = "Vietnam",
+                          "ZW" = "Zimbabwe",
+                          "ZB" = "Zimbabwe",
+                          "OM" = "Oman")) 
+```
+
+Countries included in the dataset, & number of responses per country
+
+```{r}
+table(d$Country)
+```
+
+Remove participants who still have `NA` Country, representing `r round(sum(is.na(d$Country))/ nrow(d) * 100, digits=2)`% of the data.
+
+```{r}
+d <- d %>%
+  filter(!is.na(Country))
+```
+
+Add collectivistic/individualistic label
+
+```{r}
+d <- d %>%
+  mutate(culture = case_when(
+    Country %in% c("Argentina", "Albania","Australia", "Austria", "Belgium", "Brazil", 
+                   "Bulgaria", "Canada", "Chile", "China", "Costa Rica", "Croatia", 
+                   "Czech Republic", "France", "Germany", "Greece", "Hong Kong", 
+                   "Hungary", "Israel", "Italy", "Japan", "Malaysia", "Netherlands", 
+                   "New Zealand", "Norway", "Poland", "Portugal", "Russia", 
+                   "Serbia", "Singapore", "Slovakia", "Slovenia", "South Africa", 
+                   "Spain", "Sweden", "Switzerland", "Taiwan", "United Kingdom", 
+                   "United States") ~ "Individualistic",
+    Country %in% c("Bangladesh", "Cameroon", "Colombia", "Ecuador", "Ethiopia", 
+                   "Egypt", 
+                   "Ghana", "India", "Indonesia", "Iran", "Kenya", 
+                   "Kuwait", "Malawi", "Mexico", "Morocco", "Namibia", "Nigeria", 
+                   "North Macedonia", 
+                   "Pakistan", "Peru", "Philippines", "Saudi Arabia", "Oman",
+                   "Senegal", "Sierra Leone", "Sri Lanka", "Turkey", "Vietnam", "Zimbabwe") ~ 
+      "Collectivistic",
+    TRUE ~ "Unknown"
+  ))
+
+# how many per category?
+table(d$culture)
+```
+
+
+
+
+### Demographic summary
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+demographic_summary <- d %>%
+  summarise(
+    `Avearge age (Std.)` = sprintf("%.2f (%.2f)", mean(Age, na.rm = TRUE), sd(Age, na.rm = TRUE)),
+    `Age Range` = paste(min(Age, na.rm = TRUE), "to", max(Age, na.rm = TRUE)),
+    `N. males` = sprintf("%i", sum(Gender == "Man", na.rm = TRUE)),
+    `N. female` = sprintf("%i", sum(Gender == "Woman", na.rm = TRUE)),
+    `N. non binary` = sprintf("%i", sum(Gender == "Non-binary", na.rm = TRUE)),
+    `N. prefer not to respond` = sprintf("%i", sum(Gender ==  "Prefer not to respond", na.rm = TRUE)),
+    `N. prefer to self-describe` = sprintf("%i", sum(Gender == "Prefer to self-describe", na.rm = TRUE))
+  ) %>%
+  pivot_longer(everything(), names_to = "Demographic", values_to = "Value") 
+
+knitr::kable(demographic_summary, booktabs = TRUE, 
+             caption = "Demographic Information of Participants", 
+             col.names = c("Demographic", "Value"))%>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+Split by cultural category:
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+demographic_summary <- d %>%
+  filter(!is.na(culture)) %>%
+  group_by(culture) %>%
+  summarise(
+    `N participants` = sprintf("%i", n()),
+    `Average age (SD)` = sprintf(
+      "%.2f (%.2f)",
+      mean(Age, na.rm = TRUE),
+      sd(Age, na.rm = TRUE)
+    ),
+    `Age range` = sprintf(
+      "%g to %g",
+      min(Age, na.rm = TRUE),
+      max(Age, na.rm = TRUE)
+    ),
+    `N males` = sprintf("%i", sum(Gender == "Man", na.rm = TRUE)),
+    `N females` = sprintf("%i", sum(Gender == "Woman", na.rm = TRUE)),
+    `N non-binary` = sprintf("%i", sum(Gender == "Non-binary", na.rm = TRUE)),
+    `N prefer not to respond` = sprintf(
+      "%i",
+      sum(Gender == "Prefer not to respond", na.rm = TRUE)
+    ),
+    `N prefer to self-describe` = sprintf(
+      "%i",
+      sum(Gender == "Prefer to self-describe", na.rm = TRUE)
+    ),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = -culture,
+    names_to = "Demographic",
+    values_to = "Value"
+  ) %>%
+  pivot_wider(
+    names_from = culture,
+    values_from = Value
+  ) %>%
+  select(
+    Demographic,
+    Individualistic,
+    Collectivistic
+  )
+
+knitr::kable(
+  demographic_summary,
+  booktabs = TRUE,
+  caption = "Demographic Information of Participants by Cultural Classification",
+  col.names = c(
+    "Demographic",
+    "Individualistic",
+    "Collectivistic"
+  )
+) %>%
+  kable_styling(
+    latex_options = c("scale_down", "striped")
+  )
+```
+
+```{r}
+#| echo: FALSE
+
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(kableExtra)
+
+education_table <- d %>%
+  filter(!is.na(Edu), !is.na(culture)) %>%
+  mutate(
+    Edu = factor(
+      Edu,
+      levels = c(
+        "Less than a high school or secondary school degree (or equivalent)",
+        "High school or secondary school degree (or equivalent)",
+        "Bachelor’s degree (or equivalent)",
+        "Postgraduate degree (MA, PhD, JD, etc.)",
+        "Prefer not to respond"
+      )
+    )
+  ) %>%
+  count(culture, Edu, name = "N") %>%
+  complete(culture, Edu, fill = list(N = 0)) %>%
+  group_by(culture) %>%
+  mutate(
+    percent = 100 * N / sum(N),
+    `N (%)` = sprintf("%s (%.1f%%)", format(N, big.mark = ","), percent)
+  ) %>%
+  ungroup() %>%
+  select(Education = Edu, culture, `N (%)`) %>%
+  pivot_wider(
+    names_from = culture,
+    values_from = `N (%)`
+  )
+
+education_table %>%
+  kable(
+    # format = "latex",
+    booktabs = TRUE,
+    escape = TRUE,
+    align = c("l", "c", "c"),
+    col.names = c(
+      "Education level",
+      "Collectivistic, N (\\%)",
+      "Individualistic, N (\\%)"
+    ),
+    caption = "Level of education by cultural group."
+  ) %>%
+  kable_styling(
+    latex_options = c("hold_position", "striped"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  column_spec(1, width = "8cm") %>%
+  column_spec(2:3, width = "3cm")
+```
+
+
+\newpage
+
+## Data quality checks
+
+### Use of external resources
+
+
+```{r, echo=FALSE}
+d %>%
+  mutate(
+    participant = row_number(),
+    condition = case_when(
+      feedback == "F"  & justification == "NJ" ~ "Feedback",
+      feedback == "NF" & justification == "J"  ~ "Justification",
+      feedback == "F"  & justification == "J"  ~ "Feedback + justification",
+      .default = "Baseline"
+    ),
+    condition = factor(
+      condition,
+      levels = c(
+        "Baseline",
+        "Feedback",
+        "Justification",
+        "Feedback + justification"
+      )
+    )
+  ) %>%
+  select(
+    participant,
+    condition,
+    matches("^ext_resources_use_[1-6]$")
+  ) %>%
+  pivot_longer(
+    cols = matches("^ext_resources_use_[1-6]$"),
+    names_to = "problem",
+    names_pattern = "ext_resources_use_(\\d+)",
+    values_to = "ext_resources",
+    values_drop_na = TRUE
+  ) %>%
+  mutate(
+    problem = factor(
+      paste("Problem", problem),
+      levels = paste("Problem", 1:6)
+    ),
+    ext_resources = case_when(
+      ext_resources == "Yes" ~ 1,
+      ext_resources == "No"  ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  group_by(problem, condition) %>%
+  summarise(
+    percent = 100 * mean(ext_resources, na.rm = TRUE),
+    N = sum(ext_resources, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    result = sprintf("%.2f%% (N = %d)", percent, N)
+  ) %>%
+  select(problem, condition, result) %>%
+  pivot_wider(
+    names_from = condition,
+    values_from = result
+  ) %>%
+  knitr::kable(
+    booktabs = TRUE,
+    align = c("l", "c", "c", "c", "c"),
+    caption = paste(
+      "Percentage and number of responses reporting use of external",
+      "resources, split by problem and condition."
+    )
+  ) %>%
+  kableExtra::kable_styling(
+    latex_options = c("scale_down", "striped"),
+    font_size = 9,
+    full_width = FALSE,
+    position = "center"
+  )
+
+```
+
+
+\newpage
+
+### Familiarity
+
+
+```{r, echo=FALSE}
+d %>%
+  mutate(
+    participant = row_number(),
+    condition = case_when(
+      feedback == "F"  & justification == "NJ" ~ "Feedback",
+      feedback == "NF" & justification == "J"  ~ "Justification",
+      feedback == "F"  & justification == "J"  ~ "Feedback + justification",
+      .default = "Baseline"
+    ),
+    condition = factor(
+      condition,
+      levels = c(
+        "Baseline",
+        "Feedback",
+        "Justification",
+        "Feedback + justification"
+      )
+    )
+  ) %>%
+  select(
+    participant,
+    condition,
+    starts_with("familiarity")
+  ) %>%
+  pivot_longer(
+    cols = starts_with("familiarity"),
+    names_to = "problem",
+    names_pattern = ".*_(\\d+)$",
+    values_to = "familiarity",
+    values_drop_na = TRUE
+  ) %>%
+  mutate(
+    problem = factor(
+      paste("Problem", problem),
+      levels = paste("Problem", 1:6)
+    ),
+    familiarity = case_when(
+      familiarity == "Yes" ~ 1,
+      familiarity == "No"  ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  group_by(problem, condition) %>%
+  summarise(
+    percent = 100 * mean(familiarity, na.rm = TRUE),
+    N = sum(familiarity, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    result = sprintf("%.2f%% (N = %d)", percent, N)
+  ) %>%
+  select(problem, condition, result) %>%
+  pivot_wider(
+    names_from = condition,
+    values_from = result
+  ) %>%
+  knitr::kable(
+    booktabs = TRUE,
+    align = c("l", "c", "c", "c", "c"),
+    caption = paste(
+      "Percentage and number of participants reporting familiarity,",
+      "split by problem and condition."
+    )
+  ) %>%
+  kableExtra::kable_styling(
+    latex_options = c("scale_down", "striped"),
+    font_size = 9,
+    full_width = FALSE,
+    position = "center"
+  )
+```
+
+\newpage
+
+### Language background
+
+```{r, echo=FALSE}
+library(gt)
+
+# Clean the fluency labels
+d_lang <- d %>%
+  mutate(
+    lang_fluency_clean = case_when(
+      str_detect(lang_fluency, "^Beginner") ~ "Beginner",
+      str_detect(lang_fluency, "^Intermediate") ~ "Intermediate",
+      str_detect(lang_fluency, "^Advanced") ~ "Advanced",
+      str_detect(lang_fluency, "^Expert/Proficient") ~ "Expert/Proficient",
+      lang_fluency == "Prefer not to respond" ~ "Prefer not to respond",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Overall native-language distribution
+native_summary <- d_lang %>%
+  filter(!is.na(native_lang)) %>%
+  count(response = native_lang) %>%
+  mutate(
+    section = "Native speaker of the study language",
+    denominator = sum(n),
+    percent = 100 * n / denominator
+  )
+
+# Fluency distribution, conditional on reporting non-native status
+fluency_summary <- d_lang %>%
+  filter(
+    native_lang == "No",
+    !is.na(lang_fluency_clean)
+  ) %>%
+  count(response = lang_fluency_clean) %>%
+  mutate(
+    section = "Fluency among non-native speakers",
+    denominator = sum(n),
+    percent = 100 * n / denominator
+  )
+
+language_table <- bind_rows(
+  native_summary,
+  fluency_summary
+) %>%
+  mutate(
+    response = factor(
+      response,
+      levels = c(
+        "Yes", "No", "Prefer not to respond",
+        "Beginner", "Intermediate", "Advanced",
+        "Expert/Proficient"
+      )
+    )
+  ) %>%
+  arrange(section, response) %>%
+  select(section, response, n, percent)
+
+language_table %>%
+  gt(groupname_col = "section") %>%
+  cols_label(
+    response = "Response",
+    n = "N",
+    percent = "%"
+  ) %>%
+  fmt_number(
+    columns = percent,
+    decimals = 1
+  ) %>%
+  tab_header(
+    title = "Language background of participants"
+  ) %>%
+  tab_source_note(
+    source_note = paste(
+      "Fluency was assessed only among participants who reported",
+      "that the study language was not their native language."
+    )
+  )
+```
+
+
+\newpage
+
+## Data transformation
+
+We transform the data into a long format:
+
+```{r}
+d <- d %>%
+  mutate(participant = row_number())
+
+d_crt_long <- d %>%
+  # ID + cols matching 'crt#_i' or 'crt#_r'
+  select(participant, Country, culture, justification, feedback, matches('^crt[1-6]_[ir]$')) %>% 
+  pivot_longer(
+    cols = matches('^crt[1-6]_[ir]$'),
+    names_to = 'item',
+    values_to = 'response'
+  ) %>%
+  extract( # Extract 'problem' number and 'condition' from 'item'
+    item, 
+    into = c('crt', 'problem', 'condition'),
+    regex = '(crt)([1-6])_([ir])'
+  ) %>%
+  mutate(
+    problem = as.integer(problem),
+    condition = recode(condition, 'i' = 'intuitive', 'r' = 'reflexive')
+  ) %>%
+  select(participant, problem, condition, response, justification, feedback, Country, culture)
+
+# Pivot familiarity data (one value per participant-problem)
+d_fam_long <- d %>%
+  pivot_longer(
+    cols = matches("^familiarity_[1-6]$"),
+    names_to = "fam_item",
+    values_to = "familiarity"
+  ) %>%
+  mutate(problem = as.integer(str_extract(fam_item, "[1-6]"))) %>%
+  select(participant, problem, familiarity)
+
+# Pivot ext_resources_use data (one value per participant-problem)
+d_ext_long <- d %>%
+  pivot_longer(
+    cols = matches("^ext_resources_use_[1-6]$"),
+    names_to = "ext_item",
+    values_to = "ext_resources_use"
+  ) %>%
+  mutate(problem = as.integer(str_extract(ext_item, "[1-6]"))) %>%
+  select(participant, problem, ext_resources_use)
+
+# Pivot dot_crt responses (one value per participant-problem)
+d_dot_long <- d %>%
+  pivot_longer(
+    cols = matches("^dot_crt[1-6]$"),
+    names_to = "dot_item",
+    values_to = "dot_response"
+  ) %>%
+  mutate(problem = as.integer(str_extract(dot_item, "[1-6]"))) %>%
+  select(participant, problem, dot_response)
+
+# correct answers to dot problems (double checked on Qualtrics) *** MATTEO: TO CHECK 
+dot_correct <- c(3,2,4,2,1, 3)
+d_dot_long <- d_dot_long %>%
+  mutate(dot_accuracy = ifelse(dot_response==dot_correct[d_dot_long$problem], 1, 0))
+
+# Join everything together
+d_long <- d_crt_long %>%
+  left_join(d_fam_long, by = c("participant","problem")) %>%
+  left_join(d_ext_long, by = c("participant","problem")) %>%
+  left_join(d_dot_long, by = c("participant","problem")) %>%
+  # Now each (participant, problem) has two rows (for each phase),
+  # and familiarity and ext_resources_use are duplicated for both.
+  select(participant, response, justification, feedback, problem, 
+         condition, problem, familiarity, ext_resources_use, dot_accuracy, 
+         Country, culture)
+
+# check output
+str(d_long)
+```
+
+
+Next we add response accuracy (the response option "1" was always the correct one)
+
+```{r}
+# # change any -99 to NA
+# d_long$response <- ifelse(d_long$response==-99, NA, d_long$response)
+
+# compute accuracy
+d_long$accuracy <- ifelse(!is.na(d_long$response), 
+                       ifelse(d_long$response==1,1,0),
+                       d_long$response)
+```
+
+
+\newpage
+
+Raw mean accuracy
+
+```{r}
+aggregate(accuracy ~ I(paste(justification, feedback)) + condition, 
+          data=d_long, mean)
+```
+
+\newpage
+
+Now removing responses with familiarity and/or external resources use
+
+```{r}
+aggregate(accuracy ~ I(paste(justification, feedback)) + condition, 
+          data=d_long[d_long$familiarity=="No" & d_long$ext_resources_use=="No",], 
+          mean)
+```
+
+\newpage
+
+### Dot accuracy (concurrent memory task in the intuitive phase 1)
+
+We can check the accuracy of responses to the dot task in the intuitive phase
+
+```{r}
+mean(d_long$dot_accuracy)
+with(d_long, tapply(dot_accuracy, problem, mean))
+```
+
+
+
+\newpage
+
+### Prepare data for modelling
+
+In order to enter the data in the models specified as in the pre-registration, we need some additional steps. We first transform the data such that the responses in the two phases are on distinct columns:
+
+```{r}
+d_all <- d_long %>%
+  pivot_wider(
+    names_from = condition,
+    values_from = c(response, accuracy),
+    names_sep = "_")
+str(d_all)
+```
+### Apply exclusions
+
+The preregistration included further hypothesis-specific exclusion criteria:
+
+> For the variable included in Hypothesis 1, we will exclude trials in which participants indicated that they used external resources to solve the problems, reported familiarity with the problem, failed to answer on time, or failed to answer the concurrent working memory load task correctly. For the dependent variable used in Hypotheses 2 and 3, we will exclude trials where the phase 1 response was correct; thus, participants who initially did not commit at least one error in one of the six problems will be excluded. Trials where participants indicate external resource use will also be excluded.
+
+One concern is that excluding based on familiarity response means we are excluding as much as half or more responses for some problems. However, familiarity does seem to influence accuracy, as shown in the table below:
+
+```{r, echo=FALSE, warning=FALSE}
+mean_accuracy_fam <- d_all %>%
+  filter(!is.na(accuracy_intuitive))  %>%
+  group_by(justification, feedback, familiarity) %>%
+  summarise(intuitive = mean(accuracy_intuitive),
+            reflexive = mean(accuracy_reflexive))
+
+knitr::kable(mean_accuracy_fam,
+             booktabs = TRUE, 
+             caption = "Mean accuracy by familiarity CRT problem and phase (here 'intuitive' is phase 1 and 'reflexive' is phase 2)",
+             digits=2) %>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+
+We apply exclusions for the dataset to test H1 as follow
+
+```{r}
+d_all_H1 <- d_all %>%
+  filter(ext_resources_use=="No", 
+         familiarity=="No",
+         dot_accuracy==1)
+```
+
+
+After exclusions, the mean accuracy values are the following:
+
+```{r, echo=FALSE, warning=FALSE}
+mean_accuracy_fam <- d_all_H1 %>%
+  filter(!is.na(accuracy_intuitive))  %>%
+  group_by(justification, feedback) %>%
+  summarise(intuitive = mean(accuracy_intuitive),
+            reflexive = mean(accuracy_reflexive))
+
+knitr::kable(mean_accuracy_fam,
+             booktabs = TRUE, 
+             caption = "Mean accuracy by familiarity CRT problem and phase (here 'intuitive' is phase 1 and 'reflexive' is phase 2), after all exclusions.",
+             digits=2) %>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+
+
+\pagebreak
+
+### Compute dependent variables for specific hypotheses
+
+For Hypothesis 1 ( _"less than half of correct answers will arise from error correction during deliberation"_ )  we restrict analyses to all correct responses, and examine the proportion of correct responses made in phase 2 out of all correct responses:
+
+```{r}
+dat_H1 <- d_all_H1 %>%
+  filter(accuracy_intuitive == 1 | accuracy_reflexive == 1) %>% # keep only correct, either at phase 1 or 2
+  filter(!is.na(accuracy_intuitive)) %>% # excluded missing responses in phase 1
+  mutate(correct_phase2 = ifelse(accuracy_intuitive == 0, accuracy_reflexive, 0)) %>%
+  select(correct_phase2, participant, problem, justification, feedback, Country, culture)
+str(dat_H1)
+```
+
+*Note that from the dataset for H1 I am excluding missing phase 1 responses. This is because we cannot know whether participant would have responded correctly or not in phase 1 for those problems.*
+
+The remaining hypotheses concern the probability intuitive incorrect answers (errors in phase 1) are corrected in the reflexive phase (phase 2). These hypotheses are not relevant for the pilot since we have only 1 condition. We can still use this data to estimate the probability of correction in the baseline condition.
+
+```{r}
+# The other hypotheses 
+dat_Hother <- d_all %>%
+  filter(accuracy_intuitive == 0,        # keep only intuitive errors
+         ext_resources_use=="No") %>%    # exclude also external resource use
+  mutate(corrected = accuracy_reflexive) %>%
+  select(corrected, participant, problem, justification, feedback, Country, culture)
+str(dat_Hother)
+```
+
+\newpage
+
+## Data summaries
+
+### Accuracy
+
+Proportion of correct responses split by item and phase (Note: this is after applying H1 exclusion criteria — thus excluding based on familiarity and use of external resources).
+
+```{r, echo=FALSE, warning=FALSE}
+mean_accuracy_table <- d_all_H1 %>%
+  filter(!is.na(accuracy_intuitive))  %>%
+  group_by(justification, feedback, problem) %>%
+  summarise(intuitive = mean(accuracy_intuitive),
+            reflexive = mean(accuracy_reflexive))
+
+knitr::kable(mean_accuracy_table,
+             booktabs = TRUE, 
+             caption = "Mean accuracy by CRT problem and phase (here 'intuitive' is phase 1 and 'reflexive' is phase 2)",
+             digits=2) %>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+
+\newpage
+
+### Missing responses
+
+The number of missing responses (trials in which participants did not respond in time)
+
+```{r, echo=FALSE}
+missing_table <- d_long %>%
+  filter(condition=="intuitive") %>%
+  group_by(problem) %>%
+  summarize(prop_missing = mean(is.na(response)),
+            N_missing = sum(is.na(response))) 
+
+knitr::kable(missing_table,
+             booktabs = TRUE, 
+             caption = "Proportion and number of missing responses in phase 1 (intuitive)",
+             digits=2) %>%
+  kable_styling(latex_options = c("scale_down","striped"))
+```
+
+\newpage
+
+### Responses correct in phase 1 and turned into errors in phase 2
+
+Using the data transformed as in the object `d_all` above we can check how frequently participants made a correct response in phase 1, and changed it into an error in phase 2. The table below shows how many times this occurred for each CRT problem:
+
+```{r}
+correct2error_table <- d_all %>%
+  filter(accuracy_intuitive == 1 | accuracy_reflexive == 1) %>%
+  select(accuracy_intuitive,accuracy_reflexive, problem) %>%
+  filter(accuracy_reflexive==0) %>%
+  group_by(problem) %>%
+  summarise(N = sum(accuracy_intuitive))
+
+print(correct2error_table)
+```
+
+Overall across all problems this occurred `r sum(correct2error_table$N)` times.
+
+\newpage
+
+### Confidence calibration
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "Number of correct answer (vertical coordinates) plotted as a function of the answer to the calibration responses (e.g. the participant's estimates of their own accuracy; horizontal coordinates). Some jitter added for visibility. Both plots demonstrates substantial over-confidence, since in both cases most points lie below the identity line. For this plot we only excluded problems where participants declared using external resources."
+#| label: fig-calibration
+
+tab_correct <- d_all %>%
+  filter(# familiarity=="No",
+         # dot_accuracy==1,
+         ext_resources_use=="No") %>%
+  group_by(participant) %>%
+  summarise(accuracy_intuitive = sum(accuracy_intuitive, na.rm=T),
+            accuracy_reflexive = sum(accuracy_reflexive, na.rm=T))
+
+tab_calib <- d %>%
+  mutate(participant = row_number()) %>%
+  select(calib_int, calib_ref, participant, Country, culture) %>%
+  merge(., tab_correct, by="participant")
+
+p1 <- tab_calib %>%
+  ggplot(aes(x=calib_int, y=accuracy_intuitive)) +
+  geom_abline(intercept=0, slope=1, lty=2)+
+  geom_jitter(width=0.35, height=0.35, pch=".", col="blue")+
+  coord_equal(xlim=c(-0.3,6.3), ylim=c(-0.3,6.3))+
+  ggtitle("Intuitive phase")+
+  labs(x="participant's estimate",
+       y="actual accuracy")+
+  ml_theme()
+
+p2 <- tab_calib %>%
+  ggplot(aes(x=calib_ref, y=accuracy_reflexive)) +
+  geom_abline(intercept=0, slope=1, lty=2)+
+  geom_jitter(width=0.35, height=0.35, pch=".", col="blue")+
+  coord_equal(xlim=c(-0.3,6.3), ylim=c(-0.3,6.3))+
+  ggtitle("Reflexive phase")+
+  labs(x="participant's estimate",
+       y="actual accuracy")+
+  ml_theme()
+
+p1 + p2
+```
+
+#### Confidence error and confidence bias
+
+For this type of question, the squared error provide a proper scoring rule assuming participant’s expected number correct (squared error is uniquely minimised, in expectation, by reporting the subjective mean).
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 4
+#| fig-height: 2.5
+#| fig-cap: "Confidence error, quantified as the squared error between the predicted and actual number of correct problems, split by phase and cultural category. Error bars are standard error of the mean."
+#| label: fig-confidence-squared-error
+
+
+# # the plot above is based on this data:
+# str(tab_calib)
+
+# compute SE and plot across culture categorisaion and phase
+tab_calib$SE_int <- (tab_calib$calib_int - tab_calib$accuracy_intuitive)^2
+tab_calib$SE_ref <- (tab_calib$calib_ref - tab_calib$accuracy_reflexive)^2
+
+# summarise
+se <- function(v){ sqrt(var(v, na.rm=T)) / sqrt(sum(!is.na(v))) }
+tab_calib_avg <- tab_calib %>%
+  group_by(culture) %>%
+  summarise(se_intuitive = se(SE_int),
+            mean_intuitive = mean(SE_int),
+            se_reflexive = se(SE_ref),
+            mean_reflexive = mean(SE_ref)) %>%
+  pivot_longer(
+    cols = -culture,
+    names_to = c(".value", "response_type"),
+    names_sep = "_")
+
+tab_calib_avg %>%
+  ggplot(aes(x=response_type, y=mean, group=culture, color=culture))+
+  geom_point()+ geom_line()+
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0)+
+  ml_theme()+
+  labs(x="phase", y="confidence squared error")
+```
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 4
+#| fig-height: 2.5
+#| fig-cap: "Confidence bias, quantified as the signed difference the predicted and actual number of correct problems (so bias >0 indicate over-confidence), split by phase and cultural category. Error bars are standard error of the mean."
+#| label: fig-confidence-bias
+
+
+# # the plot above is based on this data:
+# str(tab_calib)
+
+# compute BIAS and plot across culture categorisaion and phase
+tab_calib$BIAS_int <- (tab_calib$calib_int - tab_calib$accuracy_intuitive)
+tab_calib$BIAS_ref <- (tab_calib$calib_ref - tab_calib$accuracy_reflexive)
+
+# summarise
+se <- function(v){ sqrt(var(v, na.rm=T)) / sqrt(sum(!is.na(v))) }
+tab_calib_avg <- tab_calib %>%
+  group_by(culture) %>%
+  summarise(se_intuitive = se(BIAS_int),
+            mean_intuitive = mean(BIAS_int),
+            se_reflexive = se(BIAS_ref),
+            mean_reflexive = mean(BIAS_ref)) %>%
+  pivot_longer(
+    cols = -culture,
+    names_to = c(".value", "response_type"),
+    names_sep = "_")
+
+tab_calib_avg %>%
+  ggplot(aes(x=response_type, y=mean, group=culture, color=culture))+
+  geom_point()+ geom_line()+
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0)+
+  ml_theme()+
+  labs(x="phase", y="confidence bias")
+```
+
+```{r}
+#| echo: FALSE
+
+
+library(dplyr)
+library(sf)
+library(ggplot2)
+library(viridis)
+library(scales)
+library(patchwork)
+
+
+country_calib <- tab_calib %>%
+  group_by(Country) %>%
+  summarise(
+    n_int = sum(!is.na(SE_int)),
+    n_ref = sum(!is.na(SE_ref)),
+
+    MSE_int = mean(SE_int, na.rm = TRUE),
+    MSE_ref = mean(SE_ref, na.rm = TRUE),
+
+    BIAS_int = mean(BIAS_int, na.rm = TRUE),
+    BIAS_ref = mean(BIAS_ref, na.rm = TRUE),
+
+    .groups = "drop"
+  )
+
+# harmonize names
+country_calib <- country_calib %>%
+  mutate(
+    Country_map = recode(
+      Country,
+      "North Macedonia" = "The former Yugoslav Republic of Macedonia",
+      "Vietnam" = "Viet Nam",
+      .default = Country
+    )
+  )
+
+world_sf <- read_sf(paste0(
+  getwd(), "/TM_WORLD_BORDERS_SIMPL-0.3.shp"
+))
+
+
+world_calib <- world_sf %>%
+  left_join(
+    country_calib,
+    by = c("NAME" = "Country")
+  )
+
+# country_calib %>%
+#   anti_join(
+#     world_sf %>%
+#       st_drop_geometry() %>%
+#       distinct(NAME),
+#     by = c("Country" = "NAME")
+#   )
+
+mse_limits <- range(
+  c(world_calib$MSE_int, world_calib$MSE_ref),
+  na.rm = TRUE
+)
+
+bias_limit <- max(
+  abs(c(world_calib$BIAS_int, world_calib$BIAS_ref)),
+  na.rm = TRUE
+)
+
+plot_mse_map <- function(data, variable, title) {
+
+  ggplot(data) +
+    geom_sf(
+      aes(fill = .data[[variable]]),
+      colour = "white",
+      linewidth = 0.15
+    ) +
+    scale_fill_viridis_c(
+      option = "C",
+      limits = mse_limits,
+      oob = squish,
+      na.value = "grey92",
+      name = "Mean squared\nerror"
+    ) +
+    coord_sf(expand = FALSE) +
+    labs(title = title) +
+    theme_void(base_size = 11) +
+    theme(
+      plot.title = element_text(
+        face = "bold",
+        hjust = 0.5
+      ),
+      legend.position = "bottom",
+      legend.key.width = unit(2.5, "cm")
+    )
+}
+
+plot_bias_map <- function(data, variable, title) {
+
+  ggplot(data) +
+    geom_sf(
+      aes(fill = .data[[variable]]),
+      colour = "white",
+      linewidth = 0.15
+    ) +
+    scale_fill_gradient2(
+      low = "#3B4CC0",
+      mid = "white",
+      high = "#B40426",
+      midpoint = 0,
+      limits = c(-bias_limit, bias_limit),
+      oob = squish,
+      na.value = "grey92",
+      name = "Mean signed\nbias"
+    ) +
+    coord_sf(expand = FALSE) +
+    labs(title = title) +
+    theme_void(base_size = 11) +
+    theme(
+      plot.title = element_text(
+        face = "bold",
+        hjust = 0.5
+      ),
+      legend.position = "bottom",
+      legend.key.width = unit(2.5, "cm")
+    )
+}
+
+p_mse_int <- plot_mse_map(
+  world_calib,
+  "MSE_int",
+  "Calibration error: intuitive phase"
+)
+
+p_mse_ref <- plot_mse_map(
+  world_calib,
+  "MSE_ref",
+  "Calibration error: reflective phase"
+)
+
+p_bias_int <- plot_bias_map(
+  world_calib,
+  "BIAS_int",
+  "Calibration bias: intuitive phase"
+)
+
+p_bias_ref <- plot_bias_map(
+  world_calib,
+  "BIAS_ref",
+  "Calibration bias: reflective phase"
+)
+
+# p_mse_int
+# p_mse_ref
+# p_bias_int
+# p_bias_ref
+
+```
+
+\newpage
+
+#### Confidence squared-error maps
+
+This is purely explorative — I tried to do some maps of the confidence calibration question.
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "Confidence squared error map (intuitive phase)."
+#| label: fig-se-map-int
+
+p_mse_int
+
+```
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "Confidence squared error map (reflexive phase)."
+#| label: fig-se-map-ref
+
+p_mse_ref
+
+```
+
+\newpage
+
+#### Confidence bias maps
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "Confidence bias map (intuitive phase)."
+#| label: fig-bias-map-int
+
+p_bias_int
+
+```
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "Confidence bias map (reflexive phase)."
+#| label: fig-bias-map-ref
+
+p_bias_ref
+
+```
+
+
+\newpage
+
+## Analyses
+
+Recode justification and feedback as dummy variables 
+
+```{r}
+dat_H1$justification <- ifelse(dat_H1$justification=="J", 1, 0)
+dat_H1$feedback <- ifelse(dat_H1$feedback=="F", 1, 0)
+
+dat_Hother$justification <- ifelse(dat_Hother$justification=="J", 1, 0)
+dat_Hother$feedback <- ifelse(dat_Hother$feedback=="F", 1, 0)
+```
+
+
+
+### H1
+
+A plot of the variable for H1, that is the probability that a correct decision is made in phase 2 rather than in phase 1, already suggests that in general this probability is not below 0.5 
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 4
+#| fig-height: 3
+#| fig-cap: "Probability that a correct decision is made in phase 2 rather than in phase 1 (H1 variable), split by country and culture. Error bars are standard errors between participants in each country."
+#| label: fig-pH1
+
+dat_H1 %>%
+  filter(feedback==0,
+         justification==0) %>%
+  group_by(Country, culture, participant) %>%
+  summarise(correct_phase2 = mean(correct_phase2)) %>%
+  group_by(Country, culture) %>%
+  summarise(se = mlisi::bootMeanSE(correct_phase2),
+            y = mean(correct_phase2)) %>%
+  mutate(x_coord = ifelse(culture=="Collectivistic", 
+                          rnorm(n(), -0.1, 0.2),
+                          rnorm(n(), 1.1, 0.2)),
+         x_coord_g = ifelse(culture=="Collectivistic",0.1, 0.9)) %>%
+  ggplot(aes( y=y, group=culture))+
+  geom_hline(yintercept = 0.5, lty=2) +
+  geom_errorbar(aes(x=x_coord, ymin=y-se, ymax=y+se), width=0, color="dark grey")+
+  geom_point(aes(x=x_coord, color=culture))+
+  ml_theme() +
+  coord_cartesian(ylim=c(0,1), xlim=c(-0.5, 1.5))+
+  scale_x_continuous(breaks=c(0,1),
+                     labels=c("Individualistic",
+                              "Collectivistic"))+
+  labs(y="Pr. correct decision made in phase 2",
+       x="")+
+  scale_color_discrete(guide="none")
+
+
+# dat_H1 %>%
+#   filter(feedback==0,
+#          justification==0) %>%
+#   group_by(Country, culture, participant) %>%
+#   summarise(correct_phase2 = mean(correct_phase2)) %>%
+#   group_by(Country, culture) %>%
+#   summarise(se = mlisi::bootMeanSE(correct_phase2),
+#             y = mean(correct_phase2)) %>%
+#   mutate(x_coord = ifelse(culture=="Collectivistic", 
+#                           rnorm(n(), -0.1, 0.07),
+#                           rnorm(n(), 1.1-0.5, 0.07)),
+#          x_coord_g = ifelse(culture=="Collectivistic",0.1, 0.9-0.5)) %>%
+#   ggplot(aes( y=y, group=culture, fill=culture))+
+#   geom_boxplot(aes(x=x_coord_g),outliers=FALSE, notch=TRUE, alpha=0.8)+
+#   geom_hline(yintercept = 0.5, lty=2) +
+#   geom_errorbar(aes(x=x_coord, ymin=y-se, ymax=y+se), width=0, color="dark grey")+
+#   geom_point(aes(x=x_coord, color=culture))+
+#   ml_theme() +
+#   coord_cartesian(ylim=c(0,1), xlim=c(-0.3, 1.3-0.5))+
+#   scale_x_continuous(breaks=c(0,1),
+#                      labels=c("Individualistic",
+#                               "Collectivistic"))
+    
+```
+
+
+
+Fit models for H1
+
+```{r}
+mH1_all <- glmer(correct_phase2 ~ feedback * justification + 
+   (feedback * justification||Country), 
+   family = binomial("logit"), data = dat_H1, 
+   control = glmerControl(optimizer = "bobyqa", 
+      optCtrl = list(maxfun = 1e5)))
+
+summary(mH1_all)
+
+# fit country_group-level models for individualistic and collectivistic
+mH1_i <- glmer(correct_phase2 ~ feedback * justification + 
+   (feedback * justification||Country), 
+   family = binomial("logit"), 
+   data = dat_H1[dat_H1$culture == "Individualistic", ], 
+   control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+
+summary(mH1_i) 
+
+
+mH1_c <- glmer(correct_phase2 ~ feedback * justification + 
+   (feedback * justification||Country), 
+   family = binomial("logit"), 
+   data = dat_H1[dat_H1$culture == "Collectivistic", ], 
+   control = glmerControl(optimizer = "bobyqa", 
+      optCtrl = list(maxfun = 1e5)))
+
+summary(mH1_c) 
+```
+
+\newpage
+
+::: {.callout-note}
+
+### Note
+
+The model formula was preregistered as `correct_phase2 ~ feedback * justification + (feedback * justification||Country)`, however this gives a singular model warning. Convergence is OK, so fixed-effects estimates should be usable and are essentially unchanged compared to a simplified model (tested with the below direct comparison), so I am sticking to the pre-registered version.
+
+```{r, eval=TRUE}
+m_full <- glmer(
+  correct_phase2 ~ feedback * justification +
+    (feedback * justification || Country),
+  family = binomial,
+  data = dat_H1
+)
+
+m_simple <- glmer(
+  correct_phase2 ~ feedback * justification +
+    (feedback || Country),
+  family = binomial,
+  data = dat_H1
+)
+
+cbind(
+  full = fixef(m_full),
+  simple = fixef(m_simple)
+)
+
+cbind(
+  full = sqrt(diag(vcov(m_full))),
+  simple = sqrt(diag(vcov(m_simple)))
+)
+```
+
+:::
+
+\newpage
+
+The first hypothesis is about the proportion of correct responses made in the reflective phase. We predicted that this would be lower than 50% in the baseline condition. It can be computed by transforming the intercept parameter from log-odds to probability:
+
+```{r}
+exp(fixef(mH1_all)['(Intercept)'])/(1+exp(fixef(mH1_all)['(Intercept)']))
+```
+
+The hypothesis testing code, taken from the power analysis script and implementing one-tailed tests was:
+
+```{r}
+alpha <- 0.05
+# note: the tests on separate country_groups are independent one another 
+# (different countries, participants, labs, etc.), so the expected 
+# false positive rate of the composite test, run on the 2 country_group 
+# separately and using the conventional alpha = 0.05 for each test, 
+# would be 0.05^2 = 0.0025 (the hypothesis supported if and only if 
+# all 2 independent tests are significant). We don't also apply correction 
+# for multiple comparisons otherwise it would become too conservative.
+ 
+# -----------
+# H1 
+ 
+# One-tailed test for H1a
+# Testing if the intercept is significantly less than 0
+b_H1a <- fixef(mH1_all)["(Intercept)"]
+SE_H1a <- sqrt(diag(vcov(mH1_all))["(Intercept)"])
+z_H1a <- b_H1a / SE_H1a
+p_value_H1a <- pnorm(z_H1a) # left-tailed test
+H1a <- ifelse(p_value_H1a < alpha, 1, 0)
+ 
+# One-tailed tests for H1b 
+models <- list(mH1_i, mH1_c)
+names <- c("Individualistic", "Collectivistic")
+H1b_pvals <- numeric(length(models))
+H1b_results <- numeric(length(models))
+ 
+for (i in 1:length(models)) {
+  b <- fixef(models[[i]])["(Intercept)"]
+  SE <- sqrt(diag(vcov(models[[i]]))["(Intercept)"])
+  z <- b / SE
+  p_value <- pnorm(z) # left-tailed test
+  H1b_pvals[i] <- p_value
+  H1b_results[i] <- ifelse(p_value < alpha, 1, 0)
+}
+
+names(H1b_pvals) <- names
+names(H1b_results) <- names
+
+# complete test
+H1b <- ifelse(all(H1b_results == 1), 1, 0)
+```
+
+
+\newpage
+
+
+### H2
+
+The models for the remaining hypotheses can be estimated as
+
+```{r}
+# fit overall model
+m_all <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||Country), 
+   family = binomial("logit"), 
+   data = dat_Hother, 
+   control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+ 
+summary(m_all)
+
+# fit country_group-level models for weird and non-weird
+m_i <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||Country), 
+  family = binomial("logit"), 
+  data = dat_Hother[dat_Hother$culture == "Individualistic", ], 
+  control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+ 
+summary(m_i)
+
+m_c <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||Country), 
+  family = binomial("logit"), 
+  data = dat_Hother[dat_Hother$culture == "Collectivistic", ], 
+  control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+
+summary(m_c)
+```
+
+
+Test pre-registered hypotheses
+
+
+```{r}
+alpha <- 0.05
+
+# -----------
+# H2
+ 
+# feedback increases correction rate
+ 
+# One-tailed test for H2a
+# Testing if the coefficient for 'feedback' is significantly greater than 0
+b_H2a <- fixef(m_all)["feedback"]
+SE_H2a <- sqrt(diag(vcov(m_all))["feedback"])
+z_H2a <- b_H2a / SE_H2a
+p_value_H2a <- 1 - pnorm(z_H2a) # right-tailed test
+H2a <- ifelse(p_value_H2a < alpha, 1, 0)
+ 
+# One-tailed tests for H2b
+models <- list(m_i, m_c)
+names <- c("Individualistic", "Collectivistic")
+H2b_pvals <- numeric(length(models))
+H2b_results <- numeric(length(models))
+ 
+for (i in 1:length(models)) {
+  b <- fixef(models[[i]])["feedback"]
+  SE <- sqrt(diag(vcov(models[[i]]))["feedback"])
+  z <- b / SE
+  p_value <- 1 - pnorm(z) # right-tailed test
+  H2b_pvals[i] <- p_value
+  H2b_results[i] <- ifelse(p_value < alpha, 1, 0)
+}
+
+names(H2b_pvals) <- names
+names(H2b_results) <- names
+```
+
+\newpage
+
+### H3
+
+
+```{r}
+# -----------
+# H3
+ 
+# justification increases correction rate
+ 
+# One-tailed test for H3a
+# Testing if the coefficient for 'justification' is significantly greater than 0
+b_H3a <- fixef(m_all)["justification"]
+SE_H3a <- sqrt(diag(vcov(m_all))["justification"])
+z_H3a <- b_H3a / SE_H3a
+p_value_H3a <- 1 - pnorm(z_H3a) # right-tailed test
+H3a <- ifelse(p_value_H3a < alpha, 1, 0)
+ 
+# One-tailed tests for H3b 
+models <- list(m_i, m_c)
+names <- c("Individualistic", "Collectivistic")
+H3b_pvals <- numeric(length(models))
+H3b_results <- numeric(length(models))
+ 
+for (i in 1:length(models)) {
+  b <- fixef(models[[i]])["justification"]
+  SE <- sqrt(diag(vcov(models[[i]]))["justification"])
+  z <- b / SE
+  p_value <- 1 - pnorm(z) # right-tailed test
+  H3b_pvals[i] <- p_value
+  H3b_results[i] <- ifelse(p_value < alpha, 1, 0)
+}
+ 
+names(H3b_pvals) <- names
+names(H3b_results) <- names
+```
+
+\newpage
+
+### Confirmatory hypothesis testing summary (pre-registered analyses)
+
+```{r, echo=FALSE}
+# Format p-values for display
+format_p <- function(p, digits = 3) {
+  case_when(
+    is.na(p)  ~ NA_character_,
+    p < 0.001 ~ "< .001",
+    TRUE      ~ sub("^0", "", sprintf(paste0("%.", digits, "f"), p))
+  )
+}
+
+# Format the two culture-specific p-values
+format_culture_p <- function(p) {
+  paste0(
+    names(p),
+    " = ",
+    format_p(unname(p)),
+    collapse = "; "
+  )
+}
+
+# Support for each sub-hypothesis
+H1a_supported <- H1a == 1
+H1b_supported <- all(H1b_results == 1)
+
+H2a_supported <- H2a == 1
+H2b_supported <- all(H2b_results == 1)
+
+H3a_supported <- H3a == 1
+H3b_supported <- all(H3b_results == 1)
+
+
+hypothesis_results <- tribble(
+  ~Hypothesis, ~Prediction, ~Supported, ~`p-value(s)`,
+
+  "H1a",
+  "Less than half of correct answers will arise from error correction during deliberation",
+  H1a_supported,
+  format_p(p_value_H1a),
+
+  "H1b",
+  "Baseline performance is below 50% in both cultural groups",
+  H1b_supported,
+  format_culture_p(H1b_pvals),
+
+  "H2a",
+  "Feedback increases correction overall",
+  H2a_supported,
+  format_p(p_value_H2a),
+
+  "H2b",
+  "Feedback increases correction in both cultural groups",
+  H2b_supported,
+  format_culture_p(H2b_pvals),
+
+  "H3a",
+  "Justification increases correction overall",
+  H3a_supported,
+  format_p(p_value_H3a),
+
+  "H3b",
+  "Justification increases correction in both cultural groups",
+  H3b_supported,
+  format_culture_p(H3b_pvals)
+) %>%
+  mutate(
+    Supported = case_when(
+      is.na(Supported) ~ "Not estimable",
+      Supported        ~ "Yes",
+      TRUE             ~ "No"
+    )
+  )
+
+# hypothesis_results %>%
+#   kable(
+#     booktabs = TRUE,
+#     align = c("l", "l", "c", "l"),
+#     caption = "Summary of preregistered hypothesis tests"
+#   ) %>%
+#   kable_styling(latex_options = c("scale_down","striped"))
+
+hypothesis_results %>%
+  kable(
+    booktabs = TRUE,
+    align = c("l", "l", "c", "l"),
+    caption = paste(
+      "Summary of preregistered hypothesis tests after including",
+      "by-problem random intercepts"
+    )
+  ) %>%
+  kable_styling(
+    latex_options = c("striped", "hold_position"),
+    font_size = 9,
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  column_spec(
+    column = 1,
+    width = "1.3cm"
+  ) %>%
+  column_spec(
+    column = 2,
+    width = "7.5cm"
+  ) %>%
+  column_spec(
+    column = 3,
+    width = "2.0cm"
+  ) %>%
+  column_spec(
+    column = 4,
+    width = "3.5cm"
+  )
+```
+
+\newpage
+
+## Robustness & sensitivity checks
+
+### By-problem random intercepts
+
+As problems differed substantially in accuracy etc. it makes sense to add problem-specific random interceps
+
+#### H1 
+
+Fit models for H1
+
+```{r}
+mH1_all <- glmer(correct_phase2 ~ feedback * justification + 
+   (feedback * justification||Country)+ (1|problem), 
+   family = binomial("logit"), data = dat_H1, 
+   control = glmerControl(optimizer = "bobyqa", 
+      optCtrl = list(maxfun = 1e5)))
+
+summary(mH1_all )
+
+# fit country_group-level models for individualistic and collectivistic
+mH1_i <- glmer(correct_phase2 ~ feedback * justification + 
+   (feedback * justification||Country)+ (1|problem), 
+   family = binomial("logit"), 
+   data = dat_H1[dat_H1$culture == "Individualistic", ], 
+   control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+
+summary(mH1_i)
+ 
+mH1_c <- glmer(correct_phase2 ~ feedback * justification + 
+   (feedback * justification||Country)+ (1|problem), 
+   family = binomial("logit"), 
+   data = dat_H1[dat_H1$culture == "Collectivistic", ], 
+   control = glmerControl(optimizer = "bobyqa", 
+      optCtrl = list(maxfun = 1e5)))
+
+summary(mH1_c)
+```
+
+
+
+```{r}
+alpha <- 0.05
+# note: the tests on separate country_groups are independent one another 
+# (different countries, participants, labs, etc.), so the expected 
+# false positive rate of the composite test, run on the 2 country_group 
+# separately and using the conventional alpha = 0.05 for each test, 
+# would be 0.05^2 = 0.0025 (the hypothesis supported if and only if 
+# all 2 independent tests are significant). We don't also apply correction 
+# for multiple comparisons otherwise it would become too conservative.
+ 
+# -----------
+# H1 
+ 
+# One-tailed test for H1a
+# Testing if the intercept is significantly less than 0
+b_H1a <- fixef(mH1_all)["(Intercept)"]
+SE_H1a <- sqrt(diag(vcov(mH1_all))["(Intercept)"])
+z_H1a <- b_H1a / SE_H1a
+p_value_H1a <- pnorm(z_H1a) # left-tailed test
+H1a <- ifelse(p_value_H1a < alpha, 1, 0)
+ 
+# One-tailed tests for H1b 
+models <- list(mH1_i, mH1_c)
+names <- c("Individualistic", "Collectivistic")
+H1b_pvals <- numeric(length(models))
+H1b_results <- numeric(length(models))
+ 
+for (i in 1:length(models)) {
+  b <- fixef(models[[i]])["(Intercept)"]
+  SE <- sqrt(diag(vcov(models[[i]]))["(Intercept)"])
+  z <- b / SE
+  p_value <- pnorm(z) # left-tailed test
+  H1b_pvals[i] <- p_value
+  H1b_results[i] <- ifelse(p_value < alpha, 1, 0)
+}
+
+names(H1b_pvals) <- names
+names(H1b_results) <- names
+
+```
+
+
+
+\newpage
+
+#### H2
+
+
+```{r}
+# fit overall model
+m_all <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||Country)+ (1|problem), 
+   family = binomial("logit"), 
+   data = dat_Hother, 
+   control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+
+summary(m_all)
+ 
+# fit country_group-level models for weird and non-weird
+m_i <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||Country)+ (1|problem), 
+  family = binomial("logit"), 
+  data = dat_Hother[dat_Hother$culture == "Individualistic", ], 
+  control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+
+summary(m_i)
+ 
+m_c <- glmer(corrected ~ feedback * justification + 
+   (feedback * justification||Country)+ (1|problem), 
+  family = binomial("logit"), 
+  data = dat_Hother[dat_Hother$culture == "Collectivistic", ], 
+  control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+
+summary(m_c)
+```
+
+
+Test pre-registered hypotheses
+
+
+```{r}
+alpha <- 0.05
+
+# -----------
+# H2
+ 
+# feedback increases correction rate
+ 
+# One-tailed test for H2a
+# Testing if the coefficient for 'feedback' is significantly greater than 0
+b_H2a <- fixef(m_all)["feedback"]
+SE_H2a <- sqrt(diag(vcov(m_all))["feedback"])
+z_H2a <- b_H2a / SE_H2a
+p_value_H2a <- 1 - pnorm(z_H2a) # right-tailed test
+H2a <- ifelse(p_value_H2a < alpha, 1, 0)
+ 
+# One-tailed tests for H2b
+models <- list(m_i, m_c)
+names <- c("Individualistic", "Collectivistic")
+H2b_pvals <- numeric(length(models))
+H2b_results <- numeric(length(models))
+ 
+for (i in 1:length(models)) {
+  b <- fixef(models[[i]])["feedback"]
+  SE <- sqrt(diag(vcov(models[[i]]))["feedback"])
+  z <- b / SE
+  p_value <- 1 - pnorm(z) # right-tailed test
+  H2b_pvals[i] <- p_value
+  H2b_results[i] <- ifelse(p_value < alpha, 1, 0)
+}
+
+names(H2b_pvals) <- names
+names(H2b_results) <- names
+```
+
+\newpage
+
+#### H3
+
+
+```{r}
+# -----------
+# H3
+ 
+# justification increases correction rate
+ 
+# One-tailed test for H3a
+# Testing if the coefficient for 'justification' is significantly greater than 0
+b_H3a <- fixef(m_all)["justification"]
+SE_H3a <- sqrt(diag(vcov(m_all))["justification"])
+z_H3a <- b_H3a / SE_H3a
+p_value_H3a <- 1 - pnorm(z_H3a) # right-tailed test
+H3a <- ifelse(p_value_H3a < alpha, 1, 0)
+ 
+# One-tailed tests for H3b 
+models <- list(m_i, m_c)
+names <- c("Individualistic", "Collectivistic")
+H3b_pvals <- numeric(length(models))
+H3b_results <- numeric(length(models))
+ 
+for (i in 1:length(models)) {
+  b <- fixef(models[[i]])["justification"]
+  SE <- sqrt(diag(vcov(models[[i]]))["justification"])
+  z <- b / SE
+  p_value <- 1 - pnorm(z) # right-tailed test
+  H3b_pvals[i] <- p_value
+  H3b_results[i] <- ifelse(p_value < alpha, 1, 0)
+}
+ 
+names(H3b_pvals) <- names
+names(H3b_results) <- names
+```
+
+\newpage
+
+#### Hypothesis testing summary: by-problem random intercepts
+
+```{r, echo=FALSE}
+# Format p-values for display
+format_p <- function(p, digits = 3) {
+  case_when(
+    is.na(p)  ~ NA_character_,
+    p < 0.001 ~ "< .001",
+    TRUE      ~ sub("^0", "", sprintf(paste0("%.", digits, "f"), p))
+  )
+}
+
+# Format the two culture-specific p-values
+format_culture_p <- function(p) {
+  paste0(
+    names(p),
+    " = ",
+    format_p(unname(p)),
+    collapse = "; "
+  )
+}
+
+# Support for each sub-hypothesis
+H1a_supported <- H1a == 1
+H1b_supported <- all(H1b_results == 1)
+
+H2a_supported <- H2a == 1
+H2b_supported <- all(H2b_results == 1)
+
+H3a_supported <- H3a == 1
+H3b_supported <- all(H3b_results == 1)
+
+
+hypothesis_results <- tribble(
+  ~Hypothesis, ~Prediction, ~Supported, ~`p-value(s)`,
+
+  "H1a",
+  "Less than half of correct answers will arise from error correction during deliberation",
+  H1a_supported,
+  format_p(p_value_H1a),
+
+  "H1b",
+  "Baseline performance is below 50% in both cultural groups",
+  H1b_supported,
+  format_culture_p(H1b_pvals),
+
+  "H2a",
+  "Feedback increases correction overall",
+  H2a_supported,
+  format_p(p_value_H2a),
+
+  "H2b",
+  "Feedback increases correction in both cultural groups",
+  H2b_supported,
+  format_culture_p(H2b_pvals),
+
+  "H3a",
+  "Justification increases correction overall",
+  H3a_supported,
+  format_p(p_value_H3a),
+
+  "H3b",
+  "Justification increases correction in both cultural groups",
+  H3b_supported,
+  format_culture_p(H3b_pvals)
+) %>%
+  mutate(
+    Supported = case_when(
+      is.na(Supported) ~ "Not estimable",
+      Supported        ~ "Yes",
+      TRUE             ~ "No"
+    )
+  )
+
+# hypothesis_results %>%
+#   kable(
+#     booktabs = TRUE,
+#     align = c("l", "l", "c", "l"),
+#     caption = "Summary of preregistered hypothesis tests after including by-problem random intercepts"
+#   ) %>%
+#   kable_styling(latex_options = c("scale_down","striped"))
+
+hypothesis_results %>%
+  kable(
+    booktabs = TRUE,
+    align = c("l", "l", "c", "l"),
+    caption = paste(
+      "Summary of preregistered hypothesis tests after including",
+      "by-problem random intercepts"
+    )
+  ) %>%
+  kable_styling(
+    latex_options = c("striped", "hold_position"),
+    font_size = 9,
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  column_spec(
+    column = 1,
+    width = "1.3cm"
+  ) %>%
+  column_spec(
+    column = 2,
+    width = "7.5cm"
+  ) %>%
+  column_spec(
+    column = 3,
+    width = "2.0cm"
+  ) %>%
+  column_spec(
+    column = 4,
+    width = "3.5cm"
+  )
+```
+
+\newpage
+
+## Model-based maps
+
+### Maps for H1 variable
+
+These maps are based on the models with by-problem random intercepts included
+
+```{r}
+#| echo: FALSE
+
+library(sf)
+library(countrycode)
+library(rnaturalearth)
+
+country_re <- ranef(mH1_all)$Country %>%
+  as.data.frame() %>%
+  rownames_to_column("Country")
+
+# add the intercept 
+country_re$`(Intercept)` <- country_re$`(Intercept)`+ fixef(mH1_all)["(Intercept)"]
+
+country_re_long <- country_re %>%
+  pivot_longer(
+    cols = -Country,
+    names_to = "term",
+    values_to = "random_effect"
+  ) %>%
+  mutate(
+    iso3 = countrycode(
+      Country,
+      origin = "country.name",
+      destination = "iso3c",
+      custom_match = c(
+        "North Macedonia" = "MKD",
+        "Vietnam" = "VNM"
+      )
+    )
+  )
+
+world_sf <- ne_countries(
+  scale = "medium",
+  returnclass = "sf"
+) %>%
+  mutate(
+    iso3 = adm0_a3
+  )
+
+# check is any missing
+# country_re_long %>%
+#   distinct(Country, iso3) %>%
+#   anti_join(
+#     world_sf %>%
+#       st_drop_geometry() %>%
+#       distinct(iso3),
+#     by = "iso3"
+#   )
+
+plot_random_effect_map <- function(term_name) {
+
+  term_data <- country_re_long %>%
+    filter(term == term_name)
+
+  term_limit <- max(
+    abs(term_data$random_effect),
+    na.rm = TRUE
+  )
+
+  map_data <- world_sf %>%
+    left_join(
+      term_data,
+      by = "iso3"
+    )
+
+  ggplot(map_data) +
+    geom_sf(
+      aes(fill = random_effect),
+      colour = "white",
+      linewidth = 0.15
+    ) +
+    scale_fill_gradient2(
+      low = "#3B4CC0",
+      mid = "white",
+      high = "#B40426",
+      midpoint = 0,
+      limits = c(-term_limit, term_limit),
+      na.value = "grey92",
+      name = "Country\nrandom effect"
+    ) +
+    coord_sf(expand = FALSE) +
+    labs(
+      title = ifelse(
+        term_name == "(Intercept)",
+        "Country random intercepts",
+        paste("Country random slope:", term_name)
+      )#,
+      # subtitle = "Conditional modes on the log-odds scale"
+    ) +
+    theme_void(base_size = 11) +
+    theme(
+      plot.title = element_text(
+        face = "bold",
+        hjust = 0.5
+      ),
+      plot.subtitle = element_text(
+        hjust = 0.5
+      ),
+      legend.position = "bottom",
+      legend.key.width = grid::unit(2.5, "cm")
+    )
+}
+
+
+random_effect_terms <- unique(country_re_long$term)
+
+random_effect_maps <- random_effect_terms %>%
+  set_names() %>%
+  map(plot_random_effect_map)
+```
+
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "By-country random intercepts map, extracted from model predicting the fraction of correct choices made in the reflexive phase (same as H1). Note that for this plot the fixed-effect was added to the intercept, hence countries with negative values (blue colors) are countries in which participaants, in the baseline condition, tended to make the majority of correct responses in the intuitive phase."
+#| label: fig-rfx-h1-1
+
+random_effect_maps[["(Intercept)"]]
+
+```
+
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "By-country random slope map, extracted from model predicting the fraction of correct choices made in the reflexive phase (same as H1). This maps shows country-specific variations from the overall feedback effect."
+#| label: fig-rfx-h1-2
+
+random_effect_maps[["feedback"]]
+
+```
+
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "By-country random slope map, extracted from model predicting the fraction of correct choices made in the reflexive phase (same as H1). This maps shows country-specific variations from the overall justification effect."
+#| label: fig-rfx-h1-3
+
+random_effect_maps[["justification"]]
+
+```
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "By-country random slope map, extracted from model predicting the fraction of correct choices made in the reflexive phase (same as H1). This maps shows country-specific variations from the overall combined feedback + justification effect."
+#| label: fig-rfx-h1-4
+
+random_effect_maps[["feedback:justification"]]
+
+```
+
+
+
+\newpage
+
+### Maps for H2 and H3 variable
+
+
+These maps are based on the models with by-problem random intercepts included
+
+```{r}
+#| echo: FALSE
+
+library(sf)
+library(countrycode)
+library(rnaturalearth)
+
+country_re <- ranef(m_all)$Country %>%
+  as.data.frame() %>%
+  rownames_to_column("Country")
+
+# add the intercept 
+country_re$`(Intercept)` <- country_re$`(Intercept)`+ fixef(m_all)["(Intercept)"]
+
+country_re_long <- country_re %>%
+  pivot_longer(
+    cols = -Country,
+    names_to = "term",
+    values_to = "random_effect"
+  ) %>%
+  mutate(
+    iso3 = countrycode(
+      Country,
+      origin = "country.name",
+      destination = "iso3c",
+      custom_match = c(
+        "North Macedonia" = "MKD",
+        "Vietnam" = "VNM"
+      )
+    )
+  )
+
+world_sf <- ne_countries(
+  scale = "medium",
+  returnclass = "sf"
+) %>%
+  mutate(
+    iso3 = adm0_a3
+  )
+
+# check is any missing
+# country_re_long %>%
+#   distinct(Country, iso3) %>%
+#   anti_join(
+#     world_sf %>%
+#       st_drop_geometry() %>%
+#       distinct(iso3),
+#     by = "iso3"
+#   )
+
+plot_random_effect_map <- function(term_name) {
+
+  term_data <- country_re_long %>%
+    filter(term == term_name)
+
+  term_limit <- max(
+    abs(term_data$random_effect),
+    na.rm = TRUE
+  )
+
+  map_data <- world_sf %>%
+    left_join(
+      term_data,
+      by = "iso3"
+    )
+
+  ggplot(map_data) +
+    geom_sf(
+      aes(fill = random_effect),
+      colour = "white",
+      linewidth = 0.15
+    ) +
+    scale_fill_gradient2(
+      low = "#3B4CC0",
+      mid = "white",
+      high = "#B40426",
+      midpoint = 0,
+      limits = c(-term_limit, term_limit),
+      na.value = "grey92",
+      name = "Country\nrandom effect"
+    ) +
+    coord_sf(expand = FALSE) +
+    labs(
+      title = ifelse(
+        term_name == "(Intercept)",
+        "Country random intercepts",
+        paste("Country random slope:", term_name)
+      )#,
+      # subtitle = "Conditional modes on the log-odds scale"
+    ) +
+    theme_void(base_size = 11) +
+    theme(
+      plot.title = element_text(
+        face = "bold",
+        hjust = 0.5
+      ),
+      plot.subtitle = element_text(
+        hjust = 0.5
+      ),
+      legend.position = "bottom",
+      legend.key.width = grid::unit(2.5, "cm")
+    )
+}
+
+
+random_effect_terms <- unique(country_re_long$term)
+
+random_effect_maps <- random_effect_terms %>%
+  set_names() %>%
+  map(plot_random_effect_map)
+```
+
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "By-country random intercepts map, extracted from model predicting the probability that an error in the intuitive phase os corrected in the reflexive phase (variable for H2 and H3). Note that for this plot the fixed-effect was added to the intercept, hence countries with negative values (blue colors) are countries in which participaants, in the baseline condition, tended to make the majority of correct responses in the intuitive phase."
+#| label: fig-rfx-hother-1
+
+random_effect_maps[["(Intercept)"]]
+
+```
+
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "By-country random intercepts map, extracted from model predicting the probability that an error in the intuitive phase os corrected in the reflexive phase (variable for H2 and H3). This maps shows country-specific variations from the overall feedback effect."
+#| label: fig-rfx-hother-2
+
+random_effect_maps[["feedback"]]
+
+```
+
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "By-country random intercepts map, extracted from model predicting the probability that an error in the intuitive phase os corrected in the reflexive phase (variable for H2 and H3). This maps shows country-specific variations from the overall justification effect."
+#| label: fig-rfx-hother-3
+
+random_effect_maps[["justification"]]
+
+```
+
+```{r}
+#| fig-align: 'center'
+#| echo: FALSE
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "By-country random intercepts map, extracted from model predicting the probability that an error in the intuitive phase os corrected in the reflexive phase (variable for H2 and H3). This maps shows country-specific variations from the overall combined feedback + justification effect."
+#| label: fig-rfx-hother-4
+
+random_effect_maps[["feedback:justification"]]
+
+```
+
+
+\newpage
+
+## By-problem & by-participant random intercepts
+
+As there were different participants in different groups, once I enter participant as grouping factor of random effects the variance associated with country-specific random slopes goes to zero (as variability is better accounted for as individual differences) and the model return singular fit. However, the below model with 3 crossed random effects fits well
+
+```{r}
+mH1_all <- glmer(correct_phase2 ~ feedback * justification + 
+   (1|Country)+ (1|problem) + (1|participant), 
+   family = binomial("logit"), data = dat_H1, 
+   control = glmerControl(optimizer = "bobyqa", 
+      optCtrl = list(maxfun = 1e5)))
+
+summary(mH1_all)
+```
+
+
+
+
+
+
+
+
