@@ -162,14 +162,22 @@ summary_table <- data.frame(
                  total_excluded/total_initial * 100)
 )
 
-# Print the summary table as an HTML table
+# # Print the summary table as an HTML table
+# kable(summary_table, booktabs = TRUE, 
+#       col.names = c("Exclusion Criterion", 
+#                     "Number Excluded", 
+#                     "Fraction Excluded", 
+#                     "Percentage Excluded"), 
+#       caption="Each line indicates how many participants failed each criterion (applied sequentially).") %>%
+#   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+# Print the summary table 
 kable(summary_table, booktabs = TRUE, 
       col.names = c("Exclusion Criterion", 
                     "Number Excluded", 
                     "Fraction Excluded", 
                     "Percentage Excluded"), 
-      caption="Each line indicates how many participants failed each criterion (applied sequentially).") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+      caption="Each line indicates how many participants failed each criterion (applied sequentially).")
 ```
 
 
@@ -311,10 +319,14 @@ demographic_summary <- d %>%
   ) %>%
   pivot_longer(everything(), names_to = "Demographic", values_to = "Value") 
 
+# knitr::kable(demographic_summary, booktabs = TRUE, 
+#              caption = "Demographic Information of Participants", 
+#              col.names = c("Demographic", "Value"))%>%
+#   kable_styling(latex_options = c("scale_down","striped"))
+
 knitr::kable(demographic_summary, booktabs = TRUE, 
              caption = "Demographic Information of Participants", 
-             col.names = c("Demographic", "Value"))%>%
-  kable_styling(latex_options = c("scale_down","striped"))
+             col.names = c("Demographic", "Value"))
 ```
 
 
@@ -362,6 +374,20 @@ demographic_summary <- d %>%
     Collectivistic
   )
 
+# knitr::kable(
+#   demographic_summary,
+#   booktabs = TRUE,
+#   caption = "Demographic Information of Participants by Cultural Classification",
+#   col.names = c(
+#     "Demographic",
+#     "Individualistic",
+#     "Collectivistic"
+#   )
+# ) %>%
+#   kable_styling(
+#     latex_options = c("scale_down", "striped")
+#   )
+
 knitr::kable(
   demographic_summary,
   booktabs = TRUE,
@@ -369,12 +395,7 @@ knitr::kable(
   col.names = c(
     "Demographic",
     "Individualistic",
-    "Collectivistic"
-  )
-) %>%
-  kable_styling(
-    latex_options = c("scale_down", "striped")
-  )
+    "Collectivistic")) 
 ```
 
 \newpage
@@ -415,26 +436,37 @@ education_table <- d %>%
     values_from = `N (%)`
   )
 
+# education_table %>%
+#   kable(
+#     # format = "latex",
+#     booktabs = TRUE,
+#     escape = TRUE,
+#     align = c("l", "c", "c"),
+#     col.names = c(
+#       "Education level",
+#       "Collectivistic, N (\\%)",
+#       "Individualistic, N (\\%)"
+#     ),
+#     caption = "Level of education by cultural group."
+#   ) %>%
+#   kable_styling(
+#     latex_options = c("hold_position", "striped"),
+#     full_width = FALSE,
+#     position = "center"
+#   ) %>%
+#   column_spec(1, width = "8cm") %>%
+#   column_spec(2:3, width = "3cm")
+
 education_table %>%
-  kable(
-    # format = "latex",
-    booktabs = TRUE,
-    escape = TRUE,
+  knitr::kable(
     align = c("l", "c", "c"),
     col.names = c(
       "Education level",
-      "Collectivistic, N (\\%)",
-      "Individualistic, N (\\%)"
+      "Collectivistic, N (%)",
+      "Individualistic, N (%)"
     ),
     caption = "Level of education by cultural group."
-  ) %>%
-  kable_styling(
-    latex_options = c("hold_position", "striped"),
-    full_width = FALSE,
-    position = "center"
-  ) %>%
-  column_spec(1, width = "8cm") %>%
-  column_spec(2:3, width = "3cm")
+  )
 ```
 
 \newpage
@@ -506,13 +538,13 @@ d %>%
       "Percentage and number of responses reporting use of external",
       "resources, split by problem and condition."
     )
-  ) %>%
-  kableExtra::kable_styling(
-    latex_options = c("scale_down", "striped"),
-    font_size = 9,
-    full_width = FALSE,
-    position = "center"
-  )
+  ) #%>%
+  # kableExtra::kable_styling(
+  #   latex_options = c("scale_down", "striped"),
+  #   font_size = 9,
+  #   full_width = FALSE,
+  #   position = "center"
+  # )
 
 ```
 
@@ -585,13 +617,13 @@ d %>%
       "Percentage and number of participants reporting familiarity,",
       "split by problem and condition."
     )
-  ) %>%
-  kableExtra::kable_styling(
-    latex_options = c("scale_down", "striped"),
-    font_size = 9,
-    full_width = FALSE,
-    position = "center"
-  )
+  ) # %>%
+  # kableExtra::kable_styling(
+  #   latex_options = c("scale_down", "striped"),
+  #   font_size = 9,
+  #   full_width = FALSE,
+  #   position = "center"
+  # )
 ```
 
 \newpage
@@ -1053,8 +1085,8 @@ mean_accuracy_table <- d_all_H1 %>%
 knitr::kable(mean_accuracy_table,
              booktabs = TRUE, 
              caption = "Mean accuracy by CRT problem and phase (here 'intuitive' is phase 1 and 'reflective' is phase 2). Computed after applying exclusion criteria based on on familiarity and use of external resource.",
-             digits=2) %>%
-  kable_styling(latex_options = c("scale_down","striped"))
+             digits=2) # %>%
+#  kable_styling(latex_options = c("scale_down","striped"))
 ```
 
 
@@ -1456,29 +1488,29 @@ hypothesis_results %>%
       "Summary of preregistered hypothesis tests after including",
       "by-problem random intercepts"
     )
-  ) %>%
-  kable_styling(
-    latex_options = c("striped", "hold_position"),
-    font_size = 9,
-    full_width = FALSE,
-    position = "center"
-  ) %>%
-  column_spec(
-    column = 1,
-    width = "1.3cm"
-  ) %>%
-  column_spec(
-    column = 2,
-    width = "7.5cm"
-  ) %>%
-  column_spec(
-    column = 3,
-    width = "2.0cm"
-  ) %>%
-  column_spec(
-    column = 4,
-    width = "3.5cm"
-  )
+  ) # %>%
+  # kable_styling(
+  #   latex_options = c("striped", "hold_position"),
+  #   font_size = 9,
+  #   full_width = FALSE,
+  #   position = "center"
+  # ) %>%
+  # column_spec(
+  #   column = 1,
+  #   width = "1.3cm"
+  # ) %>%
+  # column_spec(
+  #   column = 2,
+  #   width = "7.5cm"
+  # ) %>%
+  # column_spec(
+  #   column = 3,
+  #   width = "2.0cm"
+  # ) %>%
+  # column_spec(
+  #   column = 4,
+  #   width = "3.5cm"
+  # )
 ```
 
 \newpage
@@ -1850,29 +1882,29 @@ hypothesis_results %>%
       "Summary of preregistered hypothesis tests after including",
       "by-problem random intercepts"
     )
-  ) %>%
-  kable_styling(
-    latex_options = c("striped", "hold_position"),
-    font_size = 9,
-    full_width = FALSE,
-    position = "center"
-  ) %>%
-  column_spec(
-    column = 1,
-    width = "1.3cm"
-  ) %>%
-  column_spec(
-    column = 2,
-    width = "7.5cm"
-  ) %>%
-  column_spec(
-    column = 3,
-    width = "2.0cm"
-  ) %>%
-  column_spec(
-    column = 4,
-    width = "3.5cm"
-  )
+  ) # %>%
+  # kable_styling(
+  #   latex_options = c("striped", "hold_position"),
+  #   font_size = 9,
+  #   full_width = FALSE,
+  #   position = "center"
+  # ) %>%
+  # column_spec(
+  #   column = 1,
+  #   width = "1.3cm"
+  # ) %>%
+  # column_spec(
+  #   column = 2,
+  #   width = "7.5cm"
+  # ) %>%
+  # column_spec(
+  #   column = 3,
+  #   width = "2.0cm"
+  # ) %>%
+  # column_spec(
+  #   column = 4,
+  #   width = "3.5cm"
+  # )
 ```
 
 
@@ -2153,29 +2185,29 @@ hypothesis_results %>%
       "Summary of preregistered hypothesis tests after including",
       "by-problem random intercepts"
     )
-  ) %>%
-  kable_styling(
-    latex_options = c("striped", "hold_position"),
-    font_size = 9,
-    full_width = FALSE,
-    position = "center"
-  ) %>%
-  column_spec(
-    column = 1,
-    width = "1.3cm"
-  ) %>%
-  column_spec(
-    column = 2,
-    width = "7.5cm"
-  ) %>%
-  column_spec(
-    column = 3,
-    width = "2.0cm"
-  ) %>%
-  column_spec(
-    column = 4,
-    width = "3.5cm"
-  )
+  ) # %>%
+  # kable_styling(
+  #   latex_options = c("striped", "hold_position"),
+  #   font_size = 9,
+  #   full_width = FALSE,
+  #   position = "center"
+  # ) %>%
+  # column_spec(
+  #   column = 1,
+  #   width = "1.3cm"
+  # ) %>%
+  # column_spec(
+  #   column = 2,
+  #   width = "7.5cm"
+  # ) %>%
+  # column_spec(
+  #   column = 3,
+  #   width = "2.0cm"
+  # ) %>%
+  # column_spec(
+  #   column = 4,
+  #   width = "3.5cm"
+  # )
 ```
 
 
