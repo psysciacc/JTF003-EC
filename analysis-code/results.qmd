@@ -1986,7 +1986,7 @@ H1b <- ifelse(all(H1b_results == 1), 1, 0)
 ```{r, include=FALSE}
 # fit overall model
 m_all <- glmer(corrected ~ feedback * justification + 
-   (feedback * justification||Country)+ (1|problem), 
+   (feedback * justification||Country)+ (1|LabID), 
    family = binomial("logit"), 
    data = dat_Hother, 
    control = glmerControl(optimizer = "bobyqa", 
@@ -1995,7 +1995,7 @@ m_all <- glmer(corrected ~ feedback * justification +
 
 # fit country_group-level models for weird and non-weird
 m_i <- glmer(corrected ~ feedback * justification + 
-   (feedback * justification||Country)+ (1|problem), 
+   (feedback * justification||Country)+ (1|LabID), 
   family = binomial("logit"), 
   data = dat_Hother[dat_Hother$culture == "Individualistic", ], 
   control = glmerControl(optimizer = "bobyqa", 
@@ -2003,7 +2003,7 @@ m_i <- glmer(corrected ~ feedback * justification +
 
 
 m_c <- glmer(corrected ~ feedback * justification + 
-   (feedback * justification||Country)+ (1|problem), 
+   (feedback * justification||Country)+ (1|LabID), 
   family = binomial("logit"), 
   data = dat_Hother[dat_Hother$culture == "Collectivistic", ], 
   control = glmerControl(optimizer = "bobyqa", 
