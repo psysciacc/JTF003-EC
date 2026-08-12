@@ -2242,17 +2242,34 @@ knitr::kable(
 
 
 ```{r}
-# mH1_exploi <- glmer(correct_phase2 ~ (feedback * justification)*(IH_score + AOT_score + IC_HI + IC_VI + IC_HC + IC_VC) + 
-#    (feedback * justification||Country)+ (1|problem), 
-#    family = binomial("logit"), data = dat_H1, 
-#    control = glmerControl(optimizer = "bobyqa", 
+# standardize individual difference measures
+dat_H1 <- dat_H1 %>%
+  mutate(IH_score = scale(IH_score),
+         AOT_score = scale(AOT_score),
+         IC_HI = scale(IC_HI),
+         IC_VI = scale(IC_VI),
+         IC_HC = scale(IC_HC),
+         IC_VC = scale(IC_VC))
+
+dat_Hother <- dat_Hother %>%
+  mutate(IH_score = scale(IH_score),
+         AOT_score = scale(AOT_score),
+         IC_HI = scale(IC_HI),
+         IC_VI = scale(IC_VI),
+         IC_HC = scale(IC_HC),
+         IC_VC = scale(IC_VC))
+
+# mH1_exploi <- glmer(correct_phase2 ~ (feedback * justification)*(IH_score + AOT_score + IC_HI + IC_VI + IC_HC + IC_VC) +
+#    (feedback * justification||Country)+ (1|problem),
+#    family = binomial("logit"), data = dat_H1,
+#    control = glmerControl(optimizer = "bobyqa",
 #       optCtrl = list(maxfun = 1e5)))
 # 
-# m_all_exploi <- glmer(corrected ~ (feedback * justification)*(IH_score + AOT_score + IC_HI + IC_VI + IC_HC + IC_VC) + 
-#    (feedback * justification||Country)+ (1|problem), 
-#    family = binomial("logit"), 
-#    data = dat_Hother, 
-#    control = glmerControl(optimizer = "bobyqa", 
+# m_all_exploi <- glmer(corrected ~ (feedback * justification)*(IH_score + AOT_score + IC_HI + IC_VI + IC_HC + IC_VC) +
+#    (feedback * justification||Country)+ (1|problem),
+#    family = binomial("logit"),
+#    data = dat_Hother,
+#    control = glmerControl(optimizer = "bobyqa",
 #      optCtrl = list(maxfun = 1e5)))
 # 
 # saveRDS(mH1_exploi, "mH1_exploi.RDS")
