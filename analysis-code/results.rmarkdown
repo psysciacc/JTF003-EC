@@ -23,7 +23,6 @@ format:
 editor: source
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE)
 
@@ -81,14 +80,16 @@ ml_theme <- function(base_size = 9, base_family = "Helvetica") {
 }
 ```
 
-
-
 ```{r load_data, include=FALSE}
 # dataset
 
 d <- read_csv("all_withNorway_noTest_countryFill_raw.csv")
 
 ```
+
+
+
+
 
 
 \newpage
@@ -101,6 +102,10 @@ d <- read_csv("all_withNorway_noTest_countryFill_raw.csv")
 Exclusion criteria applied as stated in the [preregistration](https://osf.io/preprints/psyarxiv/wegc5_v1):
 
 > We will exclude participants who did not complete the study, failed an attention check question, failed to pass the Captcha test (i.e., their Captcha score is equal to or lower than 0.5), or are not permanent residents of the geopolitical region where data collection is taking place.
+
+
+
+
 
 ```{r, echo=FALSE}
 total_initial <- nrow(d)
@@ -180,9 +185,6 @@ kable(summary_table, booktabs = TRUE,
       caption="Each line indicates how many participants failed each criterion (applied sequentially).")
 ```
 
-
-
-
 ```{r apply_exclusions, include=FALSE}
 d <- d %>%
   filter(Finished == 1,
@@ -190,8 +192,6 @@ d <- d %>%
          Q_RecaptchaScore >= 0.5,
          Country_Res_YN =="Yes")
 ```
-
-
 
 ```{r data_preparation,  include=FALSE}
 
@@ -329,7 +329,6 @@ knitr::kable(demographic_summary, booktabs = TRUE,
              col.names = c("Demographic", "Value"))
 ```
 
-
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 demographic_summary <- d %>%
   filter(!is.na(culture)) %>%
@@ -398,7 +397,15 @@ knitr::kable(
     "Collectivistic")) 
 ```
 
+
+
+
+
 \newpage
+
+
+
+
 
 ```{r}
 #| echo: FALSE
@@ -469,9 +476,17 @@ education_table %>%
   )
 ```
 
+
+
+
+
 \newpage
 
 ### Use of external resources
+
+
+
+
 
 
 ```{r, echo=FALSE}
@@ -548,9 +563,17 @@ d %>%
 
 ```
 
+
+
+
+
 \newpage
 
 ### Familiarity
+
+
+
+
 
 
 ```{r, echo=FALSE}
@@ -626,9 +649,17 @@ d %>%
   # )
 ```
 
+
+
+
+
 \newpage
 
 ### Language background
+
+
+
+
 
 ```{r, echo=FALSE}
 library(gt)
@@ -1072,9 +1103,17 @@ dat_Hother$justification <- ifelse(dat_Hother$justification=="J", 1, 0)
 dat_Hother$feedback <- ifelse(dat_Hother$feedback=="F", 1, 0)
 ```
 
+
+
+
+
 \newpage
 
 ## Confirmatory Analyses
+
+
+
+
 
 ```{r, echo=FALSE, warning=FALSE}
 mean_accuracy_table <- d_all_H1 %>%
@@ -1089,8 +1128,6 @@ knitr::kable(mean_accuracy_table,
              digits=2) # %>%
 #  kable_styling(latex_options = c("scale_down","striped"))
 ```
-
-
 
 ```{r}
 #| fig-align: 'center'
@@ -1282,9 +1319,17 @@ model_table <- function(model, caption = NULL, group = "Country",
 
 ```
 
+
+
+
+
 \newpage
 
 ### Models for H1a and H1b(Correction during deliberation)
+
+
+
+
 
 ```{r, include=FALSE}
 # fit overall model
@@ -1388,9 +1433,17 @@ model_table(mH1_i, caption="Model for H1b; individidualistic countries.")
 model_table(mH1_c, caption="Model for H1b; collectivistic countries.")
 ```
 
+
+
+
+
 \newpage
 
 ### Models for H2 and H3 (Effects of accuracy and justification)
+
+
+
+
 
 
 ```{r}
@@ -1403,9 +1456,17 @@ model_table(m_i, caption="Model for H2b and H3b; individidualistic countries.")
 model_table(m_c, caption="Model for H2b and H3b; collectivistic countries.")
 ```
 
+
+
+
+
 \newpage
 
 ### Confirmatory hypothesis testing summary
+
+
+
+
 
 ```{r, echo=FALSE}
 # Format p-values for display
@@ -1514,11 +1575,19 @@ hypothesis_results %>%
   # )
 ```
 
+
+
+
+
 \newpage
 
 ## Robustness Checks
 
 ### Random Effects for CRT Problem
+
+
+
+
 
 ```{r models_H1_check1, include=FALSE}
 # fit models for H1
@@ -1679,8 +1748,6 @@ model_table_2 <- function(model, caption = NULL,
 
 ```
 
-
-
 ```{r, include=FALSE}
 # fit overall model
 m_all <- glmer(corrected ~ feedback * justification + 
@@ -1772,7 +1839,15 @@ names(H3b_pvals) <- names
 names(H3b_results) <- names
 ```
 
+
+
+
+
 \newpage
+
+
+
+
 
 ```{r}
 
@@ -1785,7 +1860,15 @@ model_table_2(mH1_i, caption="Model for H1b (model with random intercepts for CR
 model_table_2(mH1_c, caption="Model for H1b (model with random intercepts for CRT problem); collectivistic countries.")
 ```
 
+
+
+
+
 \newpage
+
+
+
+
 
 ```{r}
 model_table_2(m_all, caption="Model for H2a and H3a (model with random intercepts for CRT problem).")
@@ -1797,9 +1880,17 @@ model_table_2(m_i, caption="Model for H2b and H3b (model with random intercepts 
 model_table_2(m_c, caption="Model for H2b and H3b (model with random intercepts for CRT problem); collectivistic countries.")
 ```
 
+
+
+
+
 \newpage
 
 #### Hypothesis testing summary
+
+
+
+
 
 ```{r, echo=FALSE}
 # Format p-values for display
@@ -1909,7 +2000,15 @@ hypothesis_results %>%
 ```
 
 
+
+
+
+
 ### Random Effects for Participating Site
+
+
+
+
 
 
 ```{r models_H1_check2, include=FALSE}
@@ -1982,8 +2081,6 @@ H1b <- ifelse(all(H1b_results == 1), 1, 0)
 
 ```
 
-
-
 ```{r, include=FALSE}
 # fit overall model
 m_all <- glmer(corrected ~ feedback * justification + 
@@ -2075,7 +2172,15 @@ names(H3b_pvals) <- names
 names(H3b_results) <- names
 ```
 
+
+
+
+
 \newpage
+
+
+
+
 
 ```{r}
 
@@ -2088,7 +2193,15 @@ model_table_2(mH1_i, caption="Model for H1b (model with random intercepts for pa
 model_table_2(mH1_c, caption="Model for H1b (model with random intercepts for participating site); collectivistic countries.")
 ```
 
+
+
+
+
 \newpage
+
+
+
+
 
 ```{r}
 model_table_2(m_all, caption="Model for H2a and H3a (model with random intercepts for participating site).")
@@ -2100,9 +2213,17 @@ model_table_2(m_i, caption="Model for H2b and H3b (model with random intercepts 
 model_table_2(m_c, caption="Model for H2b and H3b (model with random intercepts for participating site); collectivistic countries.")
 ```
 
+
+
+
+
 \newpage
 
 #### Hypothesis testing summary
+
+
+
+
 
 ```{r, echo=FALSE}
 # Format p-values for display
@@ -2213,11 +2334,19 @@ hypothesis_results %>%
 
 
 
+
+
+
+
 \newpage
 
 ## Exploratory Analyses
 
 ### Individual Differences and Corrective Behaviour
+
+
+
+
 
 ```{r}
 ind_diff_vars <- c(
@@ -2240,7 +2369,6 @@ knitr::kable(
   caption = "Correlations between individual-difference measures"
 )
 ```
-
 
 ```{r}
 # standardize individual difference measures
@@ -2280,12 +2408,19 @@ mH1_exploi <- readRDS("mH1_exploi.RDS")
 m_all_exploi <- readRDS("m_all_exploi.RDS")
 ```
 
-
 ```{r}
 model_table_2(mH1_exploi, caption="Model for H1, including all individual differences measures as predictors.")
 ```
 
+
+
+
+
 \newpage
+
+
+
+
 
 
 ```{r}
@@ -2293,7 +2428,15 @@ model_table_2(m_all_exploi, caption="Model for H2-H3, including all individual d
 ```
 
 
+
+
+
+
 ### Community and Student Sample Differences
+
+
+
+
 
 ```{r, echo=TRUE}
 # to check
@@ -2308,7 +2451,6 @@ d %>%
   group_by(Country, LabID) %>%
   summarise(N = n())
 ```
-
 
 ```{r}
 mH1_explo_sampletype <- glmer(correct_phase2 ~ (feedback * justification)*Sample +
@@ -2327,7 +2469,6 @@ m_all_explo_sampletype <- glmer(corrected ~ (feedback * justification)*Sample +
      optCtrl = list(maxfun = 1e5)))
 ```
 
-
 ```{r}
 model_table_2(mH1_explo_sampletype, caption="Model for H1, including sample type (Community vs. Student) as fixed-effect.")
 
@@ -2335,7 +2476,15 @@ model_table_2(m_all_explo_sampletype, caption="Model for H2-H3, including sample
 ```
 
 
+
+
+
+
 ### Confidence Calibration and Intellectual Humility
+
+
+
+
 
 ```{r}
 #| fig-align: 'center'
@@ -2385,8 +2534,6 @@ p1 + p2
 # library for gamm models
 library(mgcv)
 ```
-
-
 
 ```{r}
 # GAMM analysis: confidence bias modulated by IH?
@@ -2614,7 +2761,6 @@ gam_model_table <- function(models,
 }
 ```
 
-
 ```{r}
 gam_model_table(
   list(
@@ -2634,8 +2780,6 @@ gam_model_table(
   )
 )
 ```
-
-
 
 ```{r}
 #| fig-align: 'center'
@@ -2698,7 +2842,6 @@ ggplot(
 
   ml_theme()
 ```
-
 
 ```{r}
 #| fig-align: 'center'
@@ -2808,11 +2951,19 @@ ggplot(
 
 ```
 
+
+
+
+
 \newpage
 
 #### Robustness analysis: quasibinomial GAMs
 
 As a robustness analysis, we repeated the calibration analyses using quasibinomial GAMs. These models constrain predicted estimates to the possible 0–6 range while allowing for overdispersion relative to the binomial variance.
+
+
+
+
 
 ```{r}
 #| label: gam-quasibinomial
@@ -2864,7 +3015,15 @@ m_calib_ref_qbin <- gam(
 # summary(m_calib_ref_qbin)
 ```
 
+
+
+
+
 #### Model estimates
+
+
+
+
 
 ```{r}
 #| label: tbl-gam-quasibinomial
@@ -2890,6 +3049,10 @@ gam_model_table(
 ```
 
 
+
+
+
+
 <!-- ```{r} -->
 <!-- #| label: quasibinomial-dispersion -->
 
@@ -2907,6 +3070,10 @@ gam_model_table(
 
 
 #### Predicted calibration curves
+
+
+
+
 
 ```{r}
 #| label: fig-gam-qbin-calibration
@@ -3026,7 +3193,15 @@ ggplot(
   ml_theme()
 ```
 
+
+
+
+
 #### Intellectual humility interaction plots
+
+
+
+
 
 ```{r}
 #| label: fig-gam-qbin-IH
@@ -3143,6 +3318,4 @@ ggplot(
   ) +
   ml_theme()
 ```
-
-
 
