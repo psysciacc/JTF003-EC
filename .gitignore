@@ -54,3 +54,6 @@ rsconnect/
 # temporarily exclude intermediate files in data-prep
 data-preparation/*.csv
 
+# temporary files used to build analysis report
+analysis-code/*.rds
+analysis-code/*.RDS

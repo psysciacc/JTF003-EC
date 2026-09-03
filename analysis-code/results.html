@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-08-12">
+<meta name="dcterms.date" content="2026-09-03">
 
 <title>JTF003-EC Results</title>
 <style>
@@ -20,6 +20,40 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -35,6 +69,35 @@ ul.task-list li input[type="checkbox"] {
 <link href="results_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="results_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 </head>
 
@@ -67,10 +130,10 @@ ul.task-list li input[type="checkbox"] {
   </ul></li>
   <li><a href="#exploratory-analyses" id="toc-exploratory-analyses" class="nav-link" data-scroll-target="#exploratory-analyses"><span class="header-section-number">1.4</span> Exploratory Analyses</a>
   <ul class="collapse">
-  <li><a href="#individual-differences-and-corrective-behaviour" id="toc-individual-differences-and-corrective-behaviour" class="nav-link" data-scroll-target="#individual-differences-and-corrective-behaviour"><span class="header-section-number">1.4.1</span> Individual Differences and Corrective Behaviour</a></li>
-  <li><a href="#community-and-student-sample-differences" id="toc-community-and-student-sample-differences" class="nav-link" data-scroll-target="#community-and-student-sample-differences"><span class="header-section-number">1.4.2</span> Community and Student Sample Differences</a></li>
-  <li><a href="#confidence-calibration-and-intellectual-humility" id="toc-confidence-calibration-and-intellectual-humility" class="nav-link" data-scroll-target="#confidence-calibration-and-intellectual-humility"><span class="header-section-number">1.4.3</span> Confidence Calibration and Intellectual Humility</a></li>
-  <li><a href="#confidence-resolution-and-intellectual-humility" id="toc-confidence-resolution-and-intellectual-humility" class="nav-link" data-scroll-target="#confidence-resolution-and-intellectual-humility"><span class="header-section-number">1.4.4</span> Confidence Resolution and Intellectual Humility</a></li>
+  <li><a href="#scales-reliability-and-measurement-invariance" id="toc-scales-reliability-and-measurement-invariance" class="nav-link" data-scroll-target="#scales-reliability-and-measurement-invariance"><span class="header-section-number">1.4.1</span> Scales reliability and measurement invariance</a></li>
+  <li><a href="#individual-differences-and-corrective-behaviour" id="toc-individual-differences-and-corrective-behaviour" class="nav-link" data-scroll-target="#individual-differences-and-corrective-behaviour"><span class="header-section-number">1.4.2</span> Individual Differences and Corrective Behaviour</a></li>
+  <li><a href="#community-and-student-sample-differences" id="toc-community-and-student-sample-differences" class="nav-link" data-scroll-target="#community-and-student-sample-differences"><span class="header-section-number">1.4.3</span> Community and Student Sample Differences</a></li>
+  <li><a href="#confidence-calibration-and-intellectual-humility" id="toc-confidence-calibration-and-intellectual-humility" class="nav-link" data-scroll-target="#confidence-calibration-and-intellectual-humility"><span class="header-section-number">1.4.4</span> Confidence Calibration and Intellectual Humility</a></li>
   </ul></li>
   </ul></li>
   </ul>
@@ -91,7 +154,7 @@ ul.task-list li input[type="checkbox"] {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">August 12, 2026</p>
+      <p class="date">September 3, 2026</p>
     </div>
   </div>
   
@@ -458,23 +521,23 @@ ul.task-list li input[type="checkbox"] {
 <h3 data-number="1.1.3" class="anchored" data-anchor-id="language-background"><span class="header-section-number">1.1.3</span> Language background</h3>
 <div class="cell">
 <div class="cell-output-display">
-<div id="vattxymzax" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#vattxymzax table {
+<div id="mfqfimirgr" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#mfqfimirgr table {
   font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#vattxymzax thead, #vattxymzax tbody, #vattxymzax tfoot, #vattxymzax tr, #vattxymzax td, #vattxymzax th {
+#mfqfimirgr thead, #mfqfimirgr tbody, #mfqfimirgr tfoot, #mfqfimirgr tr, #mfqfimirgr td, #mfqfimirgr th {
   border-style: none;
 }
 
-#vattxymzax p {
+#mfqfimirgr p {
   margin: 0;
   padding: 0;
 }
 
-#vattxymzax .gt_table {
+#mfqfimirgr .gt_table {
   display: table;
   border-collapse: collapse;
   line-height: normal;
@@ -500,12 +563,12 @@ ul.task-list li input[type="checkbox"] {
   border-left-color: #D3D3D3;
 }
 
-#vattxymzax .gt_caption {
+#mfqfimirgr .gt_caption {
   padding-top: 4px;
   padding-bottom: 4px;
 }
 
-#vattxymzax .gt_title {
+#mfqfimirgr .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -517,7 +580,7 @@ ul.task-list li input[type="checkbox"] {
   border-bottom-width: 0;
 }
 
-#vattxymzax .gt_subtitle {
+#mfqfimirgr .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -529,7 +592,7 @@ ul.task-list li input[type="checkbox"] {
   border-top-width: 0;
 }
 
-#vattxymzax .gt_heading {
+#mfqfimirgr .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -541,13 +604,13 @@ ul.task-list li input[type="checkbox"] {
   border-right-color: #D3D3D3;
 }
 
-#vattxymzax .gt_bottom_border {
+#mfqfimirgr .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#vattxymzax .gt_col_headings {
+#mfqfimirgr .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -562,7 +625,7 @@ ul.task-list li input[type="checkbox"] {
   border-right-color: #D3D3D3;
 }
 
-#vattxymzax .gt_col_heading {
+#mfqfimirgr .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -582,7 +645,7 @@ ul.task-list li input[type="checkbox"] {
   overflow-x: hidden;
 }
 
-#vattxymzax .gt_column_spanner_outer {
+#mfqfimirgr .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -594,15 +657,15 @@ ul.task-list li input[type="checkbox"] {
   padding-right: 4px;
 }
 
-#vattxymzax .gt_column_spanner_outer:first-child {
+#mfqfimirgr .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#vattxymzax .gt_column_spanner_outer:last-child {
+#mfqfimirgr .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#vattxymzax .gt_column_spanner {
+#mfqfimirgr .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -614,11 +677,11 @@ ul.task-list li input[type="checkbox"] {
   width: 100%;
 }
 
-#vattxymzax .gt_spanner_row {
+#mfqfimirgr .gt_spanner_row {
   border-bottom-style: hidden;
 }
 
-#vattxymzax .gt_group_heading {
+#mfqfimirgr .gt_group_heading {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -644,7 +707,7 @@ ul.task-list li input[type="checkbox"] {
   text-align: left;
 }
 
-#vattxymzax .gt_empty_group_heading {
+#mfqfimirgr .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -659,15 +722,15 @@ ul.task-list li input[type="checkbox"] {
   vertical-align: middle;
 }
 
-#vattxymzax .gt_from_md > :first-child {
+#mfqfimirgr .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#vattxymzax .gt_from_md > :last-child {
+#mfqfimirgr .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#vattxymzax .gt_row {
+#mfqfimirgr .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -686,7 +749,7 @@ ul.task-list li input[type="checkbox"] {
   overflow-x: hidden;
 }
 
-#vattxymzax .gt_stub {
+#mfqfimirgr .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -699,7 +762,7 @@ ul.task-list li input[type="checkbox"] {
   padding-right: 5px;
 }
 
-#vattxymzax .gt_stub_row_group {
+#mfqfimirgr .gt_stub_row_group {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -713,15 +776,15 @@ ul.task-list li input[type="checkbox"] {
   vertical-align: top;
 }
 
-#vattxymzax .gt_row_group_first td {
+#mfqfimirgr .gt_row_group_first td {
   border-top-width: 2px;
 }
 
-#vattxymzax .gt_row_group_first th {
+#mfqfimirgr .gt_row_group_first th {
   border-top-width: 2px;
 }
 
-#vattxymzax .gt_summary_row {
+#mfqfimirgr .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -731,16 +794,16 @@ ul.task-list li input[type="checkbox"] {
   padding-right: 5px;
 }
 
-#vattxymzax .gt_first_summary_row {
+#mfqfimirgr .gt_first_summary_row {
   border-top-style: solid;
   border-top-color: #D3D3D3;
 }
 
-#vattxymzax .gt_first_summary_row.thick {
+#mfqfimirgr .gt_first_summary_row.thick {
   border-top-width: 2px;
 }
 
-#vattxymzax .gt_last_summary_row {
+#mfqfimirgr .gt_last_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -750,7 +813,7 @@ ul.task-list li input[type="checkbox"] {
   border-bottom-color: #D3D3D3;
 }
 
-#vattxymzax .gt_grand_summary_row {
+#mfqfimirgr .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -760,7 +823,7 @@ ul.task-list li input[type="checkbox"] {
   padding-right: 5px;
 }
 
-#vattxymzax .gt_first_grand_summary_row {
+#mfqfimirgr .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -770,7 +833,7 @@ ul.task-list li input[type="checkbox"] {
   border-top-color: #D3D3D3;
 }
 
-#vattxymzax .gt_last_grand_summary_row_top {
+#mfqfimirgr .gt_last_grand_summary_row_top {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -780,11 +843,11 @@ ul.task-list li input[type="checkbox"] {
   border-bottom-color: #D3D3D3;
 }
 
-#vattxymzax .gt_striped {
+#mfqfimirgr .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#vattxymzax .gt_table_body {
+#mfqfimirgr .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -793,7 +856,7 @@ ul.task-list li input[type="checkbox"] {
   border-bottom-color: #D3D3D3;
 }
 
-#vattxymzax .gt_footnotes {
+#mfqfimirgr .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -807,7 +870,7 @@ ul.task-list li input[type="checkbox"] {
   border-right-color: #D3D3D3;
 }
 
-#vattxymzax .gt_footnote {
+#mfqfimirgr .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding-top: 4px;
@@ -816,7 +879,7 @@ ul.task-list li input[type="checkbox"] {
   padding-right: 5px;
 }
 
-#vattxymzax .gt_sourcenotes {
+#mfqfimirgr .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -830,7 +893,7 @@ ul.task-list li input[type="checkbox"] {
   border-right-color: #D3D3D3;
 }
 
-#vattxymzax .gt_sourcenote {
+#mfqfimirgr .gt_sourcenote {
   font-size: 90%;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -838,72 +901,72 @@ ul.task-list li input[type="checkbox"] {
   padding-right: 5px;
 }
 
-#vattxymzax .gt_left {
+#mfqfimirgr .gt_left {
   text-align: left;
 }
 
-#vattxymzax .gt_center {
+#mfqfimirgr .gt_center {
   text-align: center;
 }
 
-#vattxymzax .gt_right {
+#mfqfimirgr .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#vattxymzax .gt_font_normal {
+#mfqfimirgr .gt_font_normal {
   font-weight: normal;
 }
 
-#vattxymzax .gt_font_bold {
+#mfqfimirgr .gt_font_bold {
   font-weight: bold;
 }
 
-#vattxymzax .gt_font_italic {
+#mfqfimirgr .gt_font_italic {
   font-style: italic;
 }
 
-#vattxymzax .gt_super {
+#mfqfimirgr .gt_super {
   font-size: 65%;
 }
 
-#vattxymzax .gt_footnote_marks {
+#mfqfimirgr .gt_footnote_marks {
   font-size: 75%;
   vertical-align: 0.4em;
   position: initial;
 }
 
-#vattxymzax .gt_asterisk {
+#mfqfimirgr .gt_asterisk {
   font-size: 100%;
   vertical-align: 0;
 }
 
-#vattxymzax .gt_indent_1 {
+#mfqfimirgr .gt_indent_1 {
   text-indent: 5px;
 }
 
-#vattxymzax .gt_indent_2 {
+#mfqfimirgr .gt_indent_2 {
   text-indent: 10px;
 }
 
-#vattxymzax .gt_indent_3 {
+#mfqfimirgr .gt_indent_3 {
   text-indent: 15px;
 }
 
-#vattxymzax .gt_indent_4 {
+#mfqfimirgr .gt_indent_4 {
   text-indent: 20px;
 }
 
-#vattxymzax .gt_indent_5 {
+#mfqfimirgr .gt_indent_5 {
   text-indent: 25px;
 }
 
-#vattxymzax .katex-display {
+#mfqfimirgr .katex-display {
   display: inline-flex !important;
   margin-bottom: 0.75em !important;
 }
 
-#vattxymzax div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#mfqfimirgr div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
   height: 0px !important;
 }
 </style>
@@ -3263,8 +3326,284 @@ Figure&nbsp;1: Probability that a correct decision is made in phase 2 rather tha
 </section>
 <section id="exploratory-analyses" class="level2" data-number="1.4">
 <h2 data-number="1.4" class="anchored" data-anchor-id="exploratory-analyses"><span class="header-section-number">1.4</span> Exploratory Analyses</h2>
-<section id="individual-differences-and-corrective-behaviour" class="level3" data-number="1.4.1">
-<h3 data-number="1.4.1" class="anchored" data-anchor-id="individual-differences-and-corrective-behaviour"><span class="header-section-number">1.4.1</span> Individual Differences and Corrective Behaviour</h3>
+<section id="scales-reliability-and-measurement-invariance" class="level3" data-number="1.4.1">
+<h3 data-number="1.4.1" class="anchored" data-anchor-id="scales-reliability-and-measurement-invariance"><span class="header-section-number">1.4.1</span> Scales reliability and measurement invariance</h3>
+<p>Note: for these analyses I have included only countries with N <span class="math inline">\(\ge\)</span> 100.</p>
+<section id="intellectual-humility" class="level4" data-number="1.4.1.1">
+<h4 data-number="1.4.1.1" class="anchored" data-anchor-id="intellectual-humility"><span class="header-section-number">1.4.1.1</span> Intellectual humility</h4>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Internal consistency of the Intellectual Humility scale by country (only countries with N&gt;100 shown).</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Country</th>
+<th style="text-align: right;">N</th>
+<th style="text-align: right;">alpha</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">United States</td>
+<td style="text-align: right;">1672</td>
+<td style="text-align: right;">0.64</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Turkey</td>
+<td style="text-align: right;">1468</td>
+<td style="text-align: right;">0.65</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Spain</td>
+<td style="text-align: right;">1446</td>
+<td style="text-align: right;">0.64</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Italy</td>
+<td style="text-align: right;">896</td>
+<td style="text-align: right;">0.57</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">United Kingdom</td>
+<td style="text-align: right;">842</td>
+<td style="text-align: right;">0.67</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Poland</td>
+<td style="text-align: right;">452</td>
+<td style="text-align: right;">0.62</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Philippines</td>
+<td style="text-align: right;">414</td>
+<td style="text-align: right;">0.68</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Australia</td>
+<td style="text-align: right;">410</td>
+<td style="text-align: right;">0.66</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Germany</td>
+<td style="text-align: right;">373</td>
+<td style="text-align: right;">0.65</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Colombia</td>
+<td style="text-align: right;">372</td>
+<td style="text-align: right;">0.67</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Malaysia</td>
+<td style="text-align: right;">349</td>
+<td style="text-align: right;">0.62</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Bulgaria</td>
+<td style="text-align: right;">348</td>
+<td style="text-align: right;">0.64</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Austria</td>
+<td style="text-align: right;">287</td>
+<td style="text-align: right;">0.62</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Canada</td>
+<td style="text-align: right;">278</td>
+<td style="text-align: right;">0.64</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Netherlands</td>
+<td style="text-align: right;">276</td>
+<td style="text-align: right;">0.67</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Greece</td>
+<td style="text-align: right;">273</td>
+<td style="text-align: right;">0.71</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">India</td>
+<td style="text-align: right;">268</td>
+<td style="text-align: right;">0.71</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Pakistan</td>
+<td style="text-align: right;">257</td>
+<td style="text-align: right;">0.64</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Slovakia</td>
+<td style="text-align: right;">236</td>
+<td style="text-align: right;">0.69</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Hungary</td>
+<td style="text-align: right;">226</td>
+<td style="text-align: right;">0.64</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Serbia</td>
+<td style="text-align: right;">220</td>
+<td style="text-align: right;">0.66</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Portugal</td>
+<td style="text-align: right;">219</td>
+<td style="text-align: right;">0.67</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Russia</td>
+<td style="text-align: right;">201</td>
+<td style="text-align: right;">0.69</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Chile</td>
+<td style="text-align: right;">197</td>
+<td style="text-align: right;">0.78</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">North Macedonia</td>
+<td style="text-align: right;">186</td>
+<td style="text-align: right;">0.62</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Egypt</td>
+<td style="text-align: right;">183</td>
+<td style="text-align: right;">0.52</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Singapore</td>
+<td style="text-align: right;">176</td>
+<td style="text-align: right;">0.73</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Kuwait</td>
+<td style="text-align: right;">168</td>
+<td style="text-align: right;">0.71</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">France</td>
+<td style="text-align: right;">166</td>
+<td style="text-align: right;">0.56</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Czech Republic</td>
+<td style="text-align: right;">158</td>
+<td style="text-align: right;">0.67</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Sierra Leone</td>
+<td style="text-align: right;">146</td>
+<td style="text-align: right;">0.71</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Nigeria</td>
+<td style="text-align: right;">144</td>
+<td style="text-align: right;">0.67</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Kenya</td>
+<td style="text-align: right;">143</td>
+<td style="text-align: right;">0.74</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">China</td>
+<td style="text-align: right;">136</td>
+<td style="text-align: right;">0.57</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">South Africa</td>
+<td style="text-align: right;">133</td>
+<td style="text-align: right;">0.72</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Indonesia</td>
+<td style="text-align: right;">123</td>
+<td style="text-align: right;">0.64</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Mexico</td>
+<td style="text-align: right;">122</td>
+<td style="text-align: right;">0.68</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Ghana</td>
+<td style="text-align: right;">110</td>
+<td style="text-align: right;">0.83</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Ethiopia</td>
+<td style="text-align: right;">109</td>
+<td style="text-align: right;">0.63</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Cameroon</td>
+<td style="text-align: right;">108</td>
+<td style="text-align: right;">0.84</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">New Zealand</td>
+<td style="text-align: right;">104</td>
+<td style="text-align: right;">0.71</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Measurement invariance analysis for the Intellectual Humility scale</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Model</th>
+<th style="text-align: center;">CFI</th>
+<th style="text-align: center;">TLI</th>
+<th style="text-align: center;">RMSEA</th>
+<th style="text-align: center;">SRMR</th>
+<th style="text-align: center;">ΔCFI</th>
+<th style="text-align: center;">ΔRMSEA</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Configural</td>
+<td style="text-align: center;">0.973</td>
+<td style="text-align: center;">0.943</td>
+<td style="text-align: center;">0.050</td>
+<td style="text-align: center;">0.029</td>
+<td style="text-align: center;">NA</td>
+<td style="text-align: center;">NA</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Metric</td>
+<td style="text-align: center;">0.956</td>
+<td style="text-align: center;">0.930</td>
+<td style="text-align: center;">0.056</td>
+<td style="text-align: center;">0.046</td>
+<td style="text-align: center;">-0.017</td>
+<td style="text-align: center;">0.005</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Scalar</td>
+<td style="text-align: center;">0.924</td>
+<td style="text-align: center;">0.905</td>
+<td style="text-align: center;">0.065</td>
+<td style="text-align: center;">0.062</td>
+<td style="text-align: center;">-0.032</td>
+<td style="text-align: center;">0.009</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>As an exploratory test of cross-country measurement invariance, we fitted multi-group CFAs in which the nine items loaded on a substantive intellectual-humility (IH) factor while separate positive- and negative-wording method factors captured the method effects identified in the original scale validation. The IH factor was specified as independent of the wording factors, while the two method factors were allowed to covary. The configural model showed good fit (CFI = .973, RMSEA = .050, SRMR = .029). We then constrained only the substantive IH loadings to equality across countries, leaving wording-factor loadings free; this produced a modest deterioration in fit (ΔCFI = −.017, ΔRMSEA = .005, ΔSRMR = .017). Adding equality constraints on item intercepts produced a larger deterioration (ΔCFI = −.032, ΔRMSEA = .009, ΔSRMR = .016). Thus, using the conventional ΔCFI ≤ .01 criterion, strict metric and scalar invariance were not supported, although departures from metric invariance were relatively modest. These results suggest that the scale captures a broadly similar construct across countries, but some caution is warranted.</p>
+</section>
+</section>
+<section id="individual-differences-and-corrective-behaviour" class="level3" data-number="1.4.2">
+<h3 data-number="1.4.2" class="anchored" data-anchor-id="individual-differences-and-corrective-behaviour"><span class="header-section-number">1.4.2</span> Individual Differences and Corrective Behaviour</h3>
 <div class="cell">
 <div class="cell-output-display">
 <table class="caption-top table table-sm table-striped small">
@@ -3620,7 +3959,7 @@ Figure&nbsp;1: Probability that a correct decision is made in phase 2 rather tha
 <div class="cell">
 <div class="cell-output-display">
 <table class="caption-top table table-sm table-striped small">
-<caption>Model for H2-H3, , including all individual differences measures as predictors.</caption>
+<caption>Model for H2-H3, including all individual differences measures as predictors.</caption>
 <colgroup>
 <col style="width: 47%">
 <col style="width: 11%">
@@ -3895,14 +4234,662 @@ Figure&nbsp;1: Probability that a correct decision is made in phase 2 rather tha
 </div>
 </div>
 </section>
-<section id="community-and-student-sample-differences" class="level3" data-number="1.4.2">
-<h3 data-number="1.4.2" class="anchored" data-anchor-id="community-and-student-sample-differences"><span class="header-section-number">1.4.2</span> Community and Student Sample Differences</h3>
+<section id="community-and-student-sample-differences" class="level3" data-number="1.4.3">
+<h3 data-number="1.4.3" class="anchored" data-anchor-id="community-and-student-sample-differences"><span class="header-section-number">1.4.3</span> Community and Student Sample Differences</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># to check</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(d<span class="sc">$</span>Sample)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+   234455         5  Chttp:// Community   Student 
+        1         4         2      4334     10669 </code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">is.na</span>(d<span class="sc">$</span>Sample))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 235</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># unique(d$Country[is.na(d$Sample)])</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co"># unique(d$LabID[is.na(d$Sample)])</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>d <span class="sc">%&gt;%</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">is.na</span>(Sample)) <span class="sc">%&gt;%</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Country, LabID) <span class="sc">%&gt;%</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">N =</span> <span class="fu">n</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 11 × 3
+# Groups:   Country [9]
+   Country     LabID        N
+   &lt;chr&gt;       &lt;chr&gt;    &lt;int&gt;
+ 1 Bangladesh  &lt;NA&gt;         3
+ 2 Colombia    3629        29
+ 3 Germany     Sample=S     1
+ 4 Germany     &lt;NA&gt;         1
+ 5 Italy       3704…        1
+ 6 Italy       &lt;NA&gt;        39
+ 7 Mexico      15           1
+ 8 Netherlands 381         77
+ 9 Norway      &lt;NA&gt;        79
+10 Serbia      &lt;NA&gt;         3
+11 Spain       3275         1</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Model for H1, including sample type (Community vs.&nbsp;Student) as fixed-effect.</caption>
+<colgroup>
+<col style="width: 48%">
+<col style="width: 11%">
+<col style="width: 7%">
+<col style="width: 22%">
+<col style="width: 10%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Predictor</th>
+<th style="text-align: right;">Estimate</th>
+<th style="text-align: right;">SE</th>
+<th style="text-align: center;">95% CI</th>
+<th style="text-align: right;">p-value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: right;">0.137</td>
+<td style="text-align: right;">0.209</td>
+<td style="text-align: center;">[-0.272, 0.547]</td>
+<td style="text-align: right;">.511</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">feedback</td>
+<td style="text-align: right;">0.336</td>
+<td style="text-align: right;">0.071</td>
+<td style="text-align: center;">[0.197, 0.474]</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">justification</td>
+<td style="text-align: right;">0.207</td>
+<td style="text-align: right;">0.072</td>
+<td style="text-align: center;">[0.065, 0.349]</td>
+<td style="text-align: right;">.004</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">SampleStudent</td>
+<td style="text-align: right;">0.172</td>
+<td style="text-align: right;">0.067</td>
+<td style="text-align: center;">[0.040, 0.304]</td>
+<td style="text-align: right;">.011</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">feedback:justification</td>
+<td style="text-align: right;">-0.100</td>
+<td style="text-align: right;">0.099</td>
+<td style="text-align: center;">[-0.295, 0.095]</td>
+<td style="text-align: right;">.313</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">feedback:SampleStudent</td>
+<td style="text-align: right;">0.024</td>
+<td style="text-align: right;">0.087</td>
+<td style="text-align: center;">[-0.147, 0.195]</td>
+<td style="text-align: right;">.784</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">justification:SampleStudent</td>
+<td style="text-align: right;">0.066</td>
+<td style="text-align: right;">0.088</td>
+<td style="text-align: center;">[-0.106, 0.238]</td>
+<td style="text-align: right;">.452</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">feedback:justification:SampleStudent</td>
+<td style="text-align: right;">0.094</td>
+<td style="text-align: right;">0.121</td>
+<td style="text-align: center;">[-0.142, 0.330]</td>
+<td style="text-align: right;">.436</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SD (Country: (Intercept))</td>
+<td style="text-align: right;">0.471</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">SD (Country: feedback)</td>
+<td style="text-align: right;">0.076</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SD (Country: justification)</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">SD (Country: feedback:justification)</td>
+<td style="text-align: right;">0.042</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SD (problem: (Intercept))</td>
+<td style="text-align: right;">0.468</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">N</td>
+<td style="text-align: right;">23760</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">N Country</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">N problem</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Model for H2-H3, including sample type (Community vs.&nbsp;Student) as fixed-effect.</caption>
+<colgroup>
+<col style="width: 47%">
+<col style="width: 11%">
+<col style="width: 7%">
+<col style="width: 23%">
+<col style="width: 10%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Predictor</th>
+<th style="text-align: right;">Estimate</th>
+<th style="text-align: right;">SE</th>
+<th style="text-align: center;">95% CI</th>
+<th style="text-align: right;">p-value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: right;">-0.573</td>
+<td style="text-align: right;">0.226</td>
+<td style="text-align: center;">[-1.015, -0.131]</td>
+<td style="text-align: right;">.011</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">feedback</td>
+<td style="text-align: right;">0.703</td>
+<td style="text-align: right;">0.053</td>
+<td style="text-align: center;">[0.600, 0.806]</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">justification</td>
+<td style="text-align: right;">0.440</td>
+<td style="text-align: right;">0.059</td>
+<td style="text-align: center;">[0.325, 0.556]</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">SampleStudent</td>
+<td style="text-align: right;">0.041</td>
+<td style="text-align: right;">0.049</td>
+<td style="text-align: center;">[-0.054, 0.136]</td>
+<td style="text-align: right;">.400</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">feedback:justification</td>
+<td style="text-align: right;">-0.162</td>
+<td style="text-align: right;">0.080</td>
+<td style="text-align: center;">[-0.318, -0.006]</td>
+<td style="text-align: right;">.042</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">feedback:SampleStudent</td>
+<td style="text-align: right;">-0.091</td>
+<td style="text-align: right;">0.062</td>
+<td style="text-align: center;">[-0.212, 0.030]</td>
+<td style="text-align: right;">.142</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">justification:SampleStudent</td>
+<td style="text-align: right;">-0.033</td>
+<td style="text-align: right;">0.067</td>
+<td style="text-align: center;">[-0.164, 0.098]</td>
+<td style="text-align: right;">.622</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">feedback:justification:SampleStudent</td>
+<td style="text-align: right;">0.155</td>
+<td style="text-align: right;">0.092</td>
+<td style="text-align: center;">[-0.025, 0.336]</td>
+<td style="text-align: right;">.092</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SD (Country: (Intercept))</td>
+<td style="text-align: right;">0.513</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">SD (Country: feedback)</td>
+<td style="text-align: right;">0.048</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SD (Country: justification)</td>
+<td style="text-align: right;">0.152</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">SD (Country: feedback:justification)</td>
+<td style="text-align: right;">0.167</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SD (problem: (Intercept))</td>
+<td style="text-align: right;">0.522</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">N</td>
+<td style="text-align: right;">47290</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">N Country</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">N problem</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;"></td>
+<td style="text-align: center;"></td>
+<td style="text-align: right;"></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </section>
-<section id="confidence-calibration-and-intellectual-humility" class="level3" data-number="1.4.3">
-<h3 data-number="1.4.3" class="anchored" data-anchor-id="confidence-calibration-and-intellectual-humility"><span class="header-section-number">1.4.3</span> Confidence Calibration and Intellectual Humility</h3>
+<section id="confidence-calibration-and-intellectual-humility" class="level3" data-number="1.4.4">
+<h3 data-number="1.4.4" class="anchored" data-anchor-id="confidence-calibration-and-intellectual-humility"><span class="header-section-number">1.4.4</span> Confidence Calibration and Intellectual Humility</h3>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div id="fig-calibration" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-align="center">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-calibration-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="results_files/figure-html/fig-calibration-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="768">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-calibration-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Number of correct answer (vertical coordinates) plotted as a function of the answer to the calibration responses (e.g.&nbsp;the participant’s estimates of their own accuracy; horizontal coordinates). Some jitter added for visibility. Both plots demonstrates substantial over-confidence, since in both cases most points lie below the identity line. For this plot we only excluded problems where participants declared using external resources.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Generalised additive models predicting participants’ estimates of performance.</caption>
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 37%">
+<col style="width: 8%">
+<col style="width: 5%">
+<col style="width: 5%">
+<col style="width: 7%">
+<col style="width: 9%">
+<col style="width: 6%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Model</th>
+<th style="text-align: left;">Component</th>
+<th style="text-align: left;">Term</th>
+<th style="text-align: right;">Estimate</th>
+<th style="text-align: right;">SE</th>
+<th style="text-align: right;">edf</th>
+<th style="text-align: right;">Ref. df</th>
+<th style="text-align: right;">Statistic</th>
+<th style="text-align: right;">p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Intuitive</td>
+<td style="text-align: left;">Parametric</td>
+<td style="text-align: left;">Intercept</td>
+<td style="text-align: right;">3.725</td>
+<td style="text-align: right;">0.011</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">349.164</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Intuitive</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Actual accuracy</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">4.121</td>
+<td style="text-align: right;">4.813</td>
+<td style="text-align: right;">151.728</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Intuitive</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Intellectual humility</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">2.279</td>
+<td style="text-align: right;">2.757</td>
+<td style="text-align: right;">10.036</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Intuitive</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Actual accuracy × intellectual humility</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">1.894</td>
+<td style="text-align: right;">2.388</td>
+<td style="text-align: right;">0.866</td>
+<td style="text-align: right;">.510</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Reflective</td>
+<td style="text-align: left;">Parametric</td>
+<td style="text-align: left;">Intercept</td>
+<td style="text-align: right;">4.975</td>
+<td style="text-align: right;">0.009</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">583.248</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Reflective</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Actual accuracy</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">4.804</td>
+<td style="text-align: right;">5.518</td>
+<td style="text-align: right;">298.650</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Reflective</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Intellectual humility</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">1.997</td>
+<td style="text-align: right;">2.456</td>
+<td style="text-align: right;">1.202</td>
+<td style="text-align: right;">.281</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Reflective</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Actual accuracy × intellectual humility</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">1.622</td>
+<td style="text-align: right;">2.019</td>
+<td style="text-align: right;">4.232</td>
+<td style="text-align: right;">.014</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div id="fig-calibration-model" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-align="center">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-calibration-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="results_files/figure-html/fig-calibration-model-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="768">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-calibration-model-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Intellectual humility and calibration of estimated performance. Generalised additive models (GAMs) predicting participants’ estimated number of correct answers from their actual accuracy and intellectual humility, fitted separately for the intuitive (left) and reflective (right) phases. Lines show model-predicted estimates for intellectual humility at the mean and ±1 SD; shaded bands indicate 95% confidence intervals. The dashed diagonal indicates perfect calibration, such that values above the line reflect overestimation and values below the line reflect underestimation. Intellectual humility was associated with a small overall shift in estimates in the intuitive phase, whereas in the reflective phase it showed a small but significant interaction with actual accuracy.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div id="fig-calibration-model-2" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-align="center">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-calibration-model-2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="results_files/figure-html/fig-calibration-model-2-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="768">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-calibration-model-2-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Intellectual humility, actual accuracy, and estimated performance. Generalised additive models (GAMs) predicting participants’ estimated number of correct answers from actual accuracy and intellectual humility, fitted separately for the intuitive (left) and reflective (right) phases. Lines show model-predicted estimates across the observed range of intellectual humility scores, plotted separately for each level of actual accuracy; shaded bands indicate 95% confidence intervals. In the intuitive phase, intellectual humility was associated with a small overall downward shift in estimated performance across accuracy levels. In the reflective phase, the association between intellectual humility and estimated performance varied modestly as a function of actual accuracy, consistent with a small but significant interaction.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div style="page-break-after: always;"></div>
+<section id="robustness-analysis-quasibinomial-gams" class="level4" data-number="1.4.4.1">
+<h4 data-number="1.4.4.1" class="anchored" data-anchor-id="robustness-analysis-quasibinomial-gams"><span class="header-section-number">1.4.4.1</span> Robustness analysis: quasibinomial GAMs</h4>
+<p>As a robustness analysis, we repeated the calibration analyses using quasibinomial GAMs. These models constrain predicted estimates to the possible 0–6 range while allowing for overdispersion relative to the binomial variance.</p>
 </section>
-<section id="confidence-resolution-and-intellectual-humility" class="level3" data-number="1.4.4">
-<h3 data-number="1.4.4" class="anchored" data-anchor-id="confidence-resolution-and-intellectual-humility"><span class="header-section-number">1.4.4</span> Confidence Resolution and Intellectual Humility</h3>
+<section id="model-estimates" class="level4" data-number="1.4.4.2">
+<h4 data-number="1.4.4.2" class="anchored" data-anchor-id="model-estimates"><span class="header-section-number">1.4.4.2</span> Model estimates</h4>
+<div id="tbl-gam-quasibinomial" class="cell quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-gam-quasibinomial-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: Quasibinomial generalised additive models predicting participants’ estimates of performance.
+</figcaption>
+<div aria-describedby="tbl-gam-quasibinomial-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="cell caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 37%">
+<col style="width: 8%">
+<col style="width: 5%">
+<col style="width: 5%">
+<col style="width: 7%">
+<col style="width: 9%">
+<col style="width: 6%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Model</th>
+<th style="text-align: left;">Component</th>
+<th style="text-align: left;">Term</th>
+<th style="text-align: right;">Estimate</th>
+<th style="text-align: right;">SE</th>
+<th style="text-align: right;">edf</th>
+<th style="text-align: right;">Ref. df</th>
+<th style="text-align: right;">Statistic</th>
+<th style="text-align: right;">p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Intuitive</td>
+<td style="text-align: left;">Parametric</td>
+<td style="text-align: left;">Intercept</td>
+<td style="text-align: right;">0.502</td>
+<td style="text-align: right;">0.008</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">65.621</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Intuitive</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Actual accuracy</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">4.420</td>
+<td style="text-align: right;">5.032</td>
+<td style="text-align: right;">135.304</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Intuitive</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Intellectual humility</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">2.187</td>
+<td style="text-align: right;">2.661</td>
+<td style="text-align: right;">10.229</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Intuitive</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Actual accuracy × intellectual humility</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">1.610</td>
+<td style="text-align: right;">2.009</td>
+<td style="text-align: right;">0.582</td>
+<td style="text-align: right;">.570</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Reflective</td>
+<td style="text-align: left;">Parametric</td>
+<td style="text-align: left;">Intercept</td>
+<td style="text-align: right;">1.662</td>
+<td style="text-align: right;">0.011</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">150.685</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Reflective</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Actual accuracy</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">5.151</td>
+<td style="text-align: right;">5.754</td>
+<td style="text-align: right;">257.390</td>
+<td style="text-align: right;">&lt; .001</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Reflective</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Intellectual humility</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">2.011</td>
+<td style="text-align: right;">2.473</td>
+<td style="text-align: right;">2.162</td>
+<td style="text-align: right;">.093</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Reflective</td>
+<td style="text-align: left;">Smooth</td>
+<td style="text-align: left;">Actual accuracy × intellectual humility</td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;"></td>
+<td style="text-align: right;">2.341</td>
+<td style="text-align: right;">2.936</td>
+<td style="text-align: right;">5.344</td>
+<td style="text-align: right;">.002</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<!-- ```{r} -->
+<!-- #| label: quasibinomial-dispersion -->
+<!-- # Estimated dispersion parameters -->
+<!-- dispersion_qbin <- tibble( -->
+<!--   Phase = c("Intuitive", "Reflective"), -->
+<!--   Dispersion = c( -->
+<!--     summary(m_calib_int_qbin)$dispersion, -->
+<!--     summary(m_calib_ref_qbin)$dispersion -->
+<!--   ) -->
+<!-- ) -->
+<!-- dispersion_qbin -->
+<!-- ``` -->
+</section>
+<section id="predicted-calibration-curves" class="level4" data-number="1.4.4.3">
+<h4 data-number="1.4.4.3" class="anchored" data-anchor-id="predicted-calibration-curves"><span class="header-section-number">1.4.4.3</span> Predicted calibration curves</h4>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div id="fig-gam-qbin-calibration" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-align="center">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-gam-qbin-calibration-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="results_files/figure-html/fig-gam-qbin-calibration-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="768">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-gam-qbin-calibration-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Quasibinomial robustness analysis of intellectual humility and calibration of estimated performance. Lines show model-predicted estimates at the mean and ±1 SD of intellectual humility; shaded bands indicate 95% confidence intervals. The dashed diagonal indicates perfect calibration.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="intellectual-humility-interaction-plots" class="level4" data-number="1.4.4.4">
+<h4 data-number="1.4.4.4" class="anchored" data-anchor-id="intellectual-humility-interaction-plots"><span class="header-section-number">1.4.4.4</span> Intellectual humility interaction plots</h4>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div id="fig-gam-qbin-IH" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-align="center">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-gam-qbin-IH-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="results_files/figure-html/fig-gam-qbin-IH-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="768">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-gam-qbin-IH-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Quasibinomial robustness analysis of intellectual humility, actual accuracy, and estimated performance. Lines show model-predicted estimates across the observed range of intellectual humility scores, separately for each level of actual accuracy; shaded bands indicate 95% confidence intervals.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
 </section>
 </section>
 </section>

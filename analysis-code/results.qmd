@@ -35,7 +35,9 @@ library(patchwork)
 library(sjPlot)
 library(gt)
 
+#
 library(psych)
+library(lavaan)
 
 # plot theme
 ml_theme <- function(base_size = 9, base_family = "Helvetica") {
@@ -2217,6 +2219,205 @@ hypothesis_results %>%
 
 ## Exploratory Analyses
 
+### Scales reliability and measurement invariance
+
+Note: for these analyses I have included only countries with N $\ge$ 100.
+
+#### Intellectual humility
+
+```{r}
+#\ 
+
+# # Cronbach's alpha
+IH_alpha_country <- d %>%
+  group_by(Country) %>%
+  group_modify(~{
+    
+    x <- .x[, IH_items]
+    
+    a <- tryCatch(
+      psych::alpha(x, check.keys = FALSE, warnings = FALSE)$total$raw_alpha,
+      error = function(e) NA_real_
+    )
+    
+    tibble(
+      N = nrow(.x),
+      alpha = a
+    )
+    
+  }) %>%
+  ungroup() %>%
+  arrange(desc(N))
+
+knitr::kable(
+  IH_alpha_country[IH_alpha_country$N >= 100,],
+  digits = 2,
+  caption = "Internal consistency of the Intellectual Humility scale by country (only countries with N>100 shown)."
+)
+```
+
+```{r, echo=FALSE, eval=FALSE}
+# measurement invariance
+
+# Naive 1 factor
+# IH_model <- 'IH =~ IH_1 + IH_2 + IH_3 + IH_4 + IH_5 + IH_6 + IH_7 + IH_8 + IH_9'
+
+# "correlated uniqueness among negative items" model
+# IH_model <- '
+#   IH =~ IH_1 + IH_2 + IH_3 + IH_4 + IH_5 +
+#         IH_6 + IH_7 + IH_8 + IH_9
+# 
+#   # shared wording/method effects
+#   IH_6 ~~ IH_8
+#   IH_6 ~~ IH_9
+#   IH_8 ~~ IH_9'
+
+# with separate method factors for positive and negative worded items
+# (this should be model 8 in Supplementary Table 3 of https://www.tandfonline.com/doi/full/10.1080/15298868.2017.1361861 )
+IH_model <- '
+  # Substantive factor
+  IH =~ IH_1 + IH_2 + IH_3 + IH_4 + IH_5 +
+        IH_6 + IH_7 + IH_8 + IH_9
+
+  # Method factors
+  POS =~ IH_1 + IH_2 + IH_3 + IH_4 + IH_5 + IH_7
+  NEG =~ IH_6 + IH_8 + IH_9
+
+  # IH is independent of wording method
+  IH ~~ 0*POS
+  IH ~~ 0*NEG
+
+  # positive and negative method effects may covary
+  POS ~~ NEG'
+
+# only use countried with N>100
+country_N <- table(d$Country)
+countries_MI <- names(country_N[country_N >= 100])
+d_IH_MI <- d %>%
+  filter(Country %in% countries_MI)
+
+# Configural
+fit_IH_config <- cfa(
+  IH_model,
+  data = d_IH_MI,
+  group = "Country",
+  estimator = "MLR",
+  std.lv = TRUE,
+  missing = "listwise"
+)
+
+# Metric: equal factor loadings
+POS_items <- c("IH_1", "IH_2", "IH_3", "IH_4", "IH_5", "IH_7")
+NEG_items <- c("IH_6", "IH_8", "IH_9")
+
+method_loadings <- c(
+  paste0("POS=~", POS_items),
+  paste0("NEG=~", NEG_items))
+
+# note from lavOptions {lavaan}
+# group.partial:
+#   A vector of character strings containing the labels of the parameters 
+#   which should be free in all groups (thereby overriding the group.equal 
+#   argument for some specific parameters).
+
+fit_IH_metric <- cfa(
+  IH_model,
+  data = d_IH_MI,
+  group = "Country",
+  estimator = "MLR",
+  std.lv = TRUE,
+  missing = "listwise",
+  group.equal = "loadings",
+  group.partial = method_loadings # Do NOT constrain wording-factor loadings (see note above)
+)
+
+
+# Scalar: equal loadings + intercepts
+fit_IH_scalar <- cfa(
+  IH_model,
+  data = d_IH_MI,
+  group = "Country",
+  estimator = "MLR",
+  std.lv = TRUE,
+  missing =  "listwise",
+  group.equal = c("loadings", "intercepts"),
+  group.partial = method_loadings
+)
+
+# Fit-index table
+get_MI_fit <- function(fit) {
+  fitMeasures(
+    fit,
+    c("cfi.robust", "tli.robust", "rmsea.robust", "srmr")
+  )
+}
+
+fits_IH <- rbind(
+  Configural = get_MI_fit(fit_IH_config),
+  Metric     = get_MI_fit(fit_IH_metric),
+  Scalar     = get_MI_fit(fit_IH_scalar)
+)
+
+# Add changes relative to previous model
+fits_IH <- cbind(
+  fits_IH,
+  delta_CFI = c(
+    NA,
+    fits_IH["Metric", "cfi.robust"] -
+      fits_IH["Configural", "cfi.robust"],
+    fits_IH["Scalar", "cfi.robust"] -
+      fits_IH["Metric", "cfi.robust"]
+  ),
+  delta_RMSEA = c(
+    NA,
+    fits_IH["Metric", "rmsea.robust"] -
+      fits_IH["Configural", "rmsea.robust"],
+    fits_IH["Scalar", "rmsea.robust"] -
+      fits_IH["Metric", "rmsea.robust"]
+  )
+)
+
+saveRDS(
+  list(
+    fits_IH = fits_IH,
+    fit_IH_config = fit_IH_config,
+    fit_IH_metric = fit_IH_metric,
+    fit_IH_scalar = fit_IH_scalar
+  ),
+  file = "IH_measurement_invariance.rds"
+)
+
+```
+
+
+```{r}
+IH_MI <- readRDS("IH_measurement_invariance.rds")
+
+fits_IH <- IH_MI$fits_IH
+
+IH_fit_table <- as.data.frame(fits_IH) %>%
+  tibble::rownames_to_column("Model") %>%
+  transmute(
+    Model,
+    CFI = cfi.robust,
+    TLI = tli.robust,
+    RMSEA = rmsea.robust,
+    SRMR = srmr,
+    `ΔCFI` = delta_CFI,
+    `ΔRMSEA` = delta_RMSEA
+  )
+
+knitr::kable(
+  IH_fit_table,
+  digits = 3,
+  caption = "Measurement invariance analysis for the Intellectual Humility scale",
+  align = c("l", rep("c", 6))
+)
+```
+
+As an exploratory test of cross-country measurement invariance, we fitted multi-group CFAs in which the nine items loaded on a substantive intellectual-humility (IH) factor while separate positive- and negative-wording method factors captured the method effects identified in the original scale validation. The IH factor was specified as independent of the wording factors, while the two method factors were allowed to covary. The configural model showed good fit (CFI = .973, RMSEA = .050, SRMR = .029). We then constrained only the substantive IH loadings to equality across countries, leaving wording-factor loadings free; this produced a modest deterioration in fit (ΔCFI = −.017, ΔRMSEA = .005, ΔSRMR = .017). Adding equality constraints on item intercepts produced a larger deterioration (ΔCFI = −.032, ΔRMSEA = .009, ΔSRMR = .016). Thus, using the conventional ΔCFI ≤ .01 criterion, strict metric and scalar invariance were not supported, although departures from metric invariance were relatively modest. These results suggest that the scale captures a broadly similar construct across countries, but some caution is warranted.
+
+
 ### Individual Differences and Corrective Behaviour
 
 ```{r}
@@ -2430,8 +2631,7 @@ m_calib_int <- gam(
     s(IH_z, k = 5) +
     ti(accuracy_intuitive, IH_z,
       k = c(7, 5),
-      bs = c("cr", "tp"))+
-    culture,
+      bs = c("cr", "tp")),
   data = tab_calib,
   method = "REML"
 )
