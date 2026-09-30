@@ -2417,8 +2417,404 @@ knitr::kable(
 
 As an exploratory test of cross-country measurement invariance, we fitted multi-group CFAs in which the nine items loaded on a substantive intellectual-humility (IH) factor while separate positive- and negative-wording method factors captured the method effects identified in the original scale validation. The IH factor was specified as independent of the wording factors, while the two method factors were allowed to covary. The configural model showed good fit (CFI = .973, RMSEA = .050, SRMR = .029). We then constrained only the substantive IH loadings to equality across countries, leaving wording-factor loadings free; this produced a modest deterioration in fit (ΔCFI = −.017, ΔRMSEA = .005, ΔSRMR = .017). Adding equality constraints on item intercepts produced a larger deterioration (ΔCFI = −.032, ΔRMSEA = .009, ΔSRMR = .016). Thus, using the conventional ΔCFI ≤ .01 criterion, strict metric and scalar invariance were not supported, although departures from metric invariance were relatively modest. These results suggest that the scale captures a broadly similar construct across countries, but some caution is warranted.
 
+#### Actively open-minded thinking scale
 
-### Individual Differences and Corrective Behaviour
+```{r, echo=FALSE, eval=FALSE}
+# ------------------------------------------------------------
+# AOT measurement invariance
+# ------------------------------------------------------------
+
+AOT_items <- paste0("AOT_", 1:13)
+
+# Keep countries with N >= 100
+country_N <- table(d$Country)
+countries_MI <- names(country_N[country_N >= 100])
+
+d_AOT_MI <- d %>%
+  filter(Country %in% countries_MI)
+
+# # One-factor model
+# AOT_model <- '
+#   AOT =~ AOT_1 + AOT_2 + AOT_3 + AOT_4 + AOT_5 +
+#          AOT_6 + AOT_7 + AOT_8 + AOT_9 + AOT_10 +
+#          AOT_11 + AOT_12 + AOT_13
+# '
+
+# general AOT factor + negative-wording method factor
+AOT_model <- '
+  # Substantive AOT factor
+  AOT =~ AOT_1 + AOT_2 + AOT_3 + AOT_4 + AOT_5 +
+         AOT_6 + AOT_7 + AOT_8 + AOT_9 + AOT_10 +
+         AOT_11 + AOT_12 + AOT_13
+
+  # Negative-wording method factor
+  NEG =~ AOT_2 + AOT_4 + AOT_5 + AOT_6 +
+         AOT_7 + AOT_8 + AOT_10 + AOT_13
+
+  # Separate substantive trait from wording effect
+  AOT ~~ 0*NEG
+'
+
+# # model containing both positive- and negative-wording method factors:
+# AOT_model <- '
+#   AOT =~ AOT_1 + AOT_2 + AOT_3 + AOT_4 + AOT_5 +
+#          AOT_6 + AOT_7 + AOT_8 + AOT_9 + AOT_10 +
+#          AOT_11 + AOT_12 + AOT_13
+# 
+#   POS =~ AOT_1 + AOT_3 + AOT_9 + AOT_11 + AOT_12
+# 
+#   NEG =~ AOT_2 + AOT_4 + AOT_5 + AOT_6 +
+#          AOT_7 + AOT_8 + AOT_10 + AOT_13
+# 
+#   AOT ~~ 0*POS
+#   AOT ~~ 0*NEG
+# 
+#   POS ~~ NEG
+# '
+
+# more contraints, orthogonal method factors
+# AOT_model <- '
+#   # substantive factor
+#   AOT =~ AOT_1 + AOT_2 + AOT_3 + AOT_4 + AOT_5 +
+#          AOT_6 + AOT_7 + AOT_8 + AOT_9 + AOT_10 +
+#          AOT_11 + AOT_12 + AOT_13
+# 
+#   # method factors
+#   POS =~ AOT_1 + AOT_3 + AOT_9 + AOT_11 + AOT_12
+# 
+#   NEG =~ AOT_2 + AOT_4 + AOT_5 + AOT_6 +
+#          AOT_7 + AOT_8 + AOT_10 + AOT_13
+# 
+#   # method factors represent nuisance variance
+#   AOT ~~ 0*POS
+#   AOT ~~ 0*NEG
+#   POS ~~ 0*NEG
+# '
+
+# Negative-wording items
+AOT_NEG_items <- c(
+  "AOT_2", "AOT_4", "AOT_5", "AOT_6",
+  "AOT_7", "AOT_8", "AOT_10", "AOT_13"
+)
+
+# Tell lavaan not to constrain these method-factor loadings
+AOT_method_loadings <- paste0("NEG=~", AOT_NEG_items)
+
+# Configural invariance:
+# same factor structure, but parameters free across countries
+fit_AOT_config <- cfa(
+  AOT_model,
+  data = d_AOT_MI,
+  group = "Country",
+  estimator = "MLR",
+  std.lv = TRUE,
+  missing = "listwise"
+)
+
+# Metric invariance:
+# factor loadings equal across countries
+fit_AOT_metric <- cfa(
+  AOT_model,
+  data = d_AOT_MI,
+  group = "Country",
+  estimator = "MLR",
+  std.lv = TRUE,
+  missing = "listwise",
+  group.equal = "loadings",
+  group.partial = AOT_method_loadings
+)
+
+# Scalar invariance:
+# factor loadings + item intercepts equal across countries
+fit_AOT_scalar <- cfa(
+  AOT_model,
+  data = d_AOT_MI,
+  group = "Country",
+  estimator = "MLR",
+  std.lv = TRUE,
+  missing = "listwise",
+  group.equal = c("loadings", "intercepts"),
+  group.partial = AOT_method_loadings
+)
+
+# # checks: OK
+# lavInspect(fit_AOT_metric, "converged")
+# lavInspect(fit_AOT_metric, "post.check")
+# 
+# lavInspect(fit_AOT_scalar, "converged")
+# lavInspect(fit_AOT_scalar, "post.check")
+
+# extract indices
+get_MI_fit <- function(fit) {
+  fitMeasures(
+    fit,
+    c(
+      "cfi.robust",
+      "tli.robust",
+      "rmsea.robust",
+      "srmr"
+    )
+  )
+}
+
+fits_AOT <- rbind(
+  Configural = get_MI_fit(fit_AOT_config),
+  Metric     = get_MI_fit(fit_AOT_metric),
+  Scalar     = get_MI_fit(fit_AOT_scalar)
+)
+
+saveRDS(
+  list(
+    fits_AOT = fits_AOT,
+    fit_AOT_config = fit_AOT_config,
+    fit_AOT_metric = fit_AOT_metric,
+    fit_AOT_scalar = fit_AOT_scalar
+  ),
+  file = "AOT_measurement_invariance.rds"
+)
+
+```
+
+
+```{r}
+
+AOT_MI <- readRDS("AOT_measurement_invariance.rds")
+
+fits_AOT <- AOT_MI$fits_AOT
+
+# compute changes
+delta_AOT <- rbind(
+  `Metric - Configural` =
+    fits_AOT["Metric", ] - fits_AOT["Configural", ],
+
+  `Scalar - Metric` =
+    fits_AOT["Scalar", ] - fits_AOT["Metric", ]
+)
+
+# round(delta_AOT, 3)
+
+# make table
+AOT_fit_table <- as.data.frame(fits_AOT) %>%
+  tibble::rownames_to_column("Model") %>%
+  mutate(
+    delta_CFI = c(
+      NA,
+      fits_AOT["Metric", "cfi.robust"] -
+        fits_AOT["Configural", "cfi.robust"],
+      fits_AOT["Scalar", "cfi.robust"] -
+        fits_AOT["Metric", "cfi.robust"]
+    ),
+    delta_RMSEA = c(
+      NA,
+      fits_AOT["Metric", "rmsea.robust"] -
+        fits_AOT["Configural", "rmsea.robust"],
+      fits_AOT["Scalar", "rmsea.robust"] -
+        fits_AOT["Metric", "rmsea.robust"]
+    ),
+    delta_SRMR = c(
+      NA,
+      fits_AOT["Metric", "srmr"] -
+        fits_AOT["Configural", "srmr"],
+      fits_AOT["Scalar", "srmr"] -
+        fits_AOT["Metric", "srmr"]
+    )
+  ) %>%
+  transmute(
+    Model,
+    CFI   = cfi.robust,
+    TLI   = tli.robust,
+    RMSEA = rmsea.robust,
+    SRMR  = srmr,
+    `ΔCFI`   = delta_CFI,
+    `ΔRMSEA` = delta_RMSEA,
+    `ΔSRMR`  = delta_SRMR
+  )
+
+knitr::kable(
+  AOT_fit_table,
+  digits = 3,
+  caption = "Measurement invariance analysis for the Actively Open-Minded Thinking scale",
+  align = c("l", rep("c", 7))
+)
+
+# # Standardised substantive AOT loadings
+# standardizedSolution(fit_AOT_config) %>%
+#   filter(op == "=~", lhs == "AOT") %>%
+#   mutate(
+#     Country = fit_AOT_config@Data@group.label[group]
+#   ) %>%
+#   group_by(rhs) %>%
+#   summarise(
+#     mean_loading = mean(est.std),
+#     sd_loading   = sd(est.std),
+#     min_loading  = min(est.std),
+#     max_loading  = max(est.std)
+#   ) %>%
+#   arrange(mean_loading)
+
+```
+
+The AOT scale showed mixed evidence of configural fit (CFI = .923, RMSEA = .051, SRMR = .044). When equality constraints were imposed only on the substantive AOT loadings, while allowing loadings on the negative-wording method factor to vary across countries, model fit deteriorated moderately (ΔCFI = −.034, ΔRMSEA = .005, ΔSRMR = .023), indicating departures from full metric invariance. Imposing equality constraints on item intercepts produced a much larger deterioration in fit (ΔCFI = −.139, ΔRMSEA = .022, ΔSRMR = .024), providing clear evidence against scalar invariance.
+
+
+#### Individualistic and collectivistic cultural tendencies scale
+
+> The original 1998 paper only reported that an EFA-supported four-factor structure, followed by convergent/discriminant validity analyses; they did not do an extensive four-factor CFA structure validation of the 16-items scale. 
+
+> NOTE: post-fitting diagnostic check (`lavInspect(fit, "post.check")`) was failing for these model, in particular Egypt, Kuwait and Ghana (with N ranging from 110 to 183) had negative eigenvalues, indicating non-positive defined covariance matrices. Therefore I have increased the threshold for being included in the analysis from 100 to 200 responses (considering also that this is a more complex 4 factor model).
+
+```{r}
+IC_items <- paste0("IC_", 1:16)
+
+IC_model <- '
+  HI =~ IC_1 + IC_2 + IC_3 + IC_4
+  VI =~ IC_5 + IC_6 + IC_7 + IC_8
+  HC =~ IC_9 + IC_10 + IC_11 + IC_12
+  VC =~ IC_13 + IC_14 + IC_15 + IC_16'
+
+# as above, restrict to countries with at least 100 observations
+country_N <- table(d$Country)
+countries_MI <- names(country_N[country_N >= 200])
+
+d_IC_MI <- d %>%
+  filter(Country %in% countries_MI)
+
+```
+
+```{r, eval=FALSE}
+
+# Configural
+fit_IC_config <- cfa(
+  IC_model,
+  data = d_IC_MI,
+  group = "Country",
+  estimator = "MLR",
+  std.lv = TRUE,
+  missing = "listwise"
+)
+
+# Metric
+fit_IC_metric <- cfa(
+  IC_model,
+  data = d_IC_MI,
+  group = "Country",
+  estimator = "MLR",
+  std.lv = TRUE,
+  missing = "listwise",
+  group.equal = "loadings"
+)
+
+# Scalar
+fit_IC_scalar <- cfa(
+  IC_model,
+  data = d_IC_MI,
+  group = "Country",
+  estimator = "MLR",
+  std.lv = TRUE,
+  missing = "listwise",
+  group.equal = c("loadings", "intercepts")
+)
+
+# sapply(
+#   list(
+#     Configural = fit_IC_config,
+#     Metric     = fit_IC_metric,
+#     Scalar     = fit_IC_scalar
+#   ),
+#   function(x) c(
+#     converged = lavInspect(x, "converged"),
+#     post_check = lavInspect(x, "post.check")
+#   )
+# )
+# # post.check fails if including countries up to 100 responses
+# # all check passed including restricting to at least 200 responses
+
+get_MI_fit <- function(fit) {
+  fitMeasures(
+    fit,
+    c("cfi.robust", "tli.robust",
+      "rmsea.robust", "srmr")
+  )
+}
+
+fits_IC <- rbind(
+  Configural = get_MI_fit(fit_IC_config),
+  Metric     = get_MI_fit(fit_IC_metric),
+  Scalar     = get_MI_fit(fit_IC_scalar)
+)
+
+# round(fits_IC, 3)
+
+saveRDS(
+  list(
+    fits_IC = fits_IC,
+    fit_IC_config = fit_IC_config,
+    fit_IC_metric = fit_IC_metric,
+    fit_IC_scalar = fit_IC_scalar
+  ),
+  file = "IC_measurement_invariance.rds"
+)
+
+```
+
+
+```{r}
+
+IC_MI <- readRDS("IC_measurement_invariance.rds")
+fits_IC <- IC_MI$fits_IC
+
+IC_fit_table <- as.data.frame(fits_IC) %>%
+  tibble::rownames_to_column("Model") %>%
+  mutate(
+    delta_CFI = c(
+      NA,
+      fits_IC["Metric", "cfi.robust"] -
+        fits_IC["Configural", "cfi.robust"],
+      fits_IC["Scalar", "cfi.robust"] -
+        fits_IC["Metric", "cfi.robust"]
+    ),
+    delta_RMSEA = c(
+      NA,
+      fits_IC["Metric", "rmsea.robust"] -
+        fits_IC["Configural", "rmsea.robust"],
+      fits_IC["Scalar", "rmsea.robust"] -
+        fits_IC["Metric", "rmsea.robust"]
+    ),
+    delta_SRMR = c(
+      NA,
+      fits_IC["Metric", "srmr"] -
+        fits_IC["Configural", "srmr"],
+      fits_IC["Scalar", "srmr"] -
+        fits_IC["Metric", "srmr"]
+    )
+  ) %>%
+  transmute(
+    Model,
+    CFI = cfi.robust,
+    TLI = tli.robust,
+    RMSEA = rmsea.robust,
+    SRMR = srmr,
+    `ΔCFI` = delta_CFI,
+    `ΔRMSEA` = delta_RMSEA,
+    `ΔSRMR` = delta_SRMR
+  )
+
+knitr::kable(
+  IC_fit_table,
+  digits = 3,
+  caption = paste(
+    "Measurement invariance analysis for the",
+    "Individualism–Collectivism scale"
+  ),
+  align = c("l", rep("c", 7))
+)
+```
+
+For the Individualism–Collectivism scale, measurement invariance was examined using the proposed four-factor structure (horizontal individualism, vertical individualism, horizontal collectivism, and vertical collectivism). Because models including smaller country samples produced inadmissible solutions, analyses were restricted to countries with at least 200 participants. The configural model showed mixed absolute fit (CFI = .833, RMSEA = .075, SRMR = .074), providing only moderate support for the four-factor structure across countries. Constraining factor loadings to equality resulted in a relatively small deterioration in fit (ΔCFI = −.018, ΔRMSEA = .000, ΔSRMR = .007); thus, strict metric invariance was not supported according to the conventional ΔCFI ≤ .01 criterion, although the results were broadly consistent with approximate metric comparability. In contrast, imposing equality constraints on item intercepts produced a substantial deterioration in fit (ΔCFI = −.191, ΔRMSEA = .027, ΔSRMR = .023), providing clear evidence against scalar invariance. Accordingly, associations involving the four dimensions may be reasonably comparable across countries, but cross-country comparisons of their observed mean levels should be interpreted with considerable caution.
+
+\newpage
+
+### Individual Differences and Corrective Behaviour (pre-registered analyses)
 
 ```{r}
 ind_diff_vars <- c(
@@ -2473,7 +2869,7 @@ dat_Hother <- dat_Hother %>%
 #    data = dat_Hother,
 #    control = glmerControl(optimizer = "bobyqa",
 #      optCtrl = list(maxfun = 1e5)))
-# 
+
 # saveRDS(mH1_exploi, "mH1_exploi.RDS")
 # saveRDS(m_all_exploi, "m_all_exploi.RDS")
 
@@ -2493,6 +2889,132 @@ model_table_2(mH1_exploi, caption="Model for H1, including all individual differ
 model_table_2(m_all_exploi, caption="Model for H2-H3, including all individual differences measures as predictors.")
 ```
 
+
+### Individual Differences and Corrective Behaviour (revised)
+
+In this version all scales are centred within country, to mitigate issues of violation of scalar invariance and improve comparability across countries.
+
+<!-- ; and I have temporarily removed AOT as it showed more evidence for violation of metric invariance -->
+
+```{r}
+
+ID_vars <- c(
+  "IH_score", "AOT_score",
+  "IC_HI", "IC_VI", "IC_HC", "IC_VC"
+)
+
+# d <- d %>%
+#   group_by(Country) %>%
+#   mutate(
+#     across(
+#       all_of(ID_vars),
+#       ~ .x - mean(.x, na.rm = TRUE),
+#       .names = "{.col}_wc"
+#     )
+#   ) %>%
+#   ungroup()
+
+dat_H1 <- dat_H1 %>%
+  group_by(Country) %>%
+  mutate(
+    across(
+      all_of(ID_vars),
+      ~ .x - mean(.x, na.rm = TRUE),
+      .names = "{.col}_wc"
+    )
+  ) %>%
+  ungroup()
+
+dat_Hother <- dat_Hother %>%
+  group_by(Country) %>%
+  mutate(
+    across(
+      all_of(ID_vars),
+      ~ .x - mean(.x, na.rm = TRUE),
+      .names = "{.col}_wc"
+    )
+  ) %>%
+  ungroup()
+
+```
+
+
+```{r}
+# standardize individual difference measures
+dat_H1 <- dat_H1 %>%
+  mutate(IH_score_wc = scale(IH_score_wc),
+         AOT_score_wc = scale(AOT_score_wc),
+         IC_HI_wc = scale(IC_HI_wc),
+         IC_VI_wc = scale(IC_VI_wc),
+         IC_HC_wc = scale(IC_HC_wc),
+         IC_VC_wc = scale(IC_VC_wc))
+
+dat_Hother <- dat_Hother %>%
+  mutate(IH_score_wc = scale(IH_score_wc),
+         AOT_score_wc = scale(AOT_score_wc),
+         IC_HI_wc = scale(IC_HI_wc),
+         IC_VI_wc = scale(IC_VI_wc),
+         IC_HC_wc = scale(IC_HC_wc),
+         IC_VC_wc = scale(IC_VC_wc))
+
+
+# mH1_exploi_v2 <- glmer(
+#   correct_phase2 ~
+#     (feedback * justification) *
+#     (IH_score_wc + # AOT_score_wc +
+#      IC_HI_wc + IC_VI_wc + IC_HC_wc + IC_VC_wc) +
+#     (feedback * justification || Country) +
+#     (1 | problem),
+#   family = binomial("logit"),
+#   data = dat_H1,
+#   control = glmerControl(
+#     optimizer = "bobyqa",
+#     optCtrl = list(maxfun = 1e5)
+#   )
+# )
+# 
+# saveRDS(mH1_exploi_v2, "mH1_exploi_v2.RDS")
+# 
+# m_all_exploi_v2 <- glmer(
+#   corrected ~
+#     (feedback * justification) *
+#     (IH_score_wc + # AOT_score_wc +
+#      IC_HI_wc + IC_VI_wc + IC_HC_wc + IC_VC_wc) +
+#     (feedback * justification || Country) +
+#     (1 | problem),
+#   family = binomial("logit"),
+#   data = dat_Hother,
+#   control = glmerControl(
+#     optimizer = "bobyqa",
+#     optCtrl = list(maxfun = 1e5)
+#   )
+# )
+# 
+# 
+# saveRDS(m_all_exploi_v2, "m_all_exploi_v2.RDS")
+
+
+mH1_exploi_v2 <- readRDS("mH1_exploi_v2.RDS")
+m_all_exploi_v2 <- readRDS("m_all_exploi_v2.RDS")
+```
+
+
+\newpage
+
+```{r}
+model_table_2(mH1_exploi_v2, caption="Model for H1, including all individual differences measures as predictors.")
+```
+
+\newpage
+
+
+```{r}
+model_table_2(m_all_exploi_v2, caption="Model for H2-H3, including all individual differences measures as predictors.")
+```
+
+
+
+\newpage
 
 ### Community and Student Sample Differences
 
@@ -2535,6 +3057,8 @@ model_table_2(mH1_explo_sampletype, caption="Model for H1, including sample type
 model_table_2(m_all_explo_sampletype, caption="Model for H2-H3, including sample type (Community vs. Student) as fixed-effect.")
 ```
 
+
+\newpage
 
 ### Confidence Calibration and Intellectual Humility
 
