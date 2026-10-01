@@ -306,6 +306,24 @@ d <- d %>%
       "Collectivistic",
     TRUE ~ "Unknown"
   ))
+
+
+# add Global Collectivism Index (GCI)
+gci <- read.csv("GCI.csv", header=T, sep="\t")
+
+gci <- gci %>%
+  mutate(country = str_remove(country, "\\*$")) # remove trailing * (countries not recognised by UN, e.g. Hong Kong?)
+gci$country[gci$country=="Macedonia"]  <- "North Macedonia"
+
+# join
+d <- d %>%
+  left_join(
+    gci %>% select(country, CGI),
+    by = c("Country" = "country")
+  )
+
+# all(is.na(d$CGI) == is.na(d$Country)) # sanity check: TRUE
+
 ```
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
@@ -966,7 +984,7 @@ d <- d %>%
 
 d_crt_long <- d %>%
   # ID + cols matching 'crt#_i' or 'crt#_r'
-  select(participant, Country, culture, justification, feedback, matches('^crt[1-6]_[ir]$'), evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref) %>% 
+  select(participant, Country, culture, justification, feedback, matches('^crt[1-6]_[ir]$'), evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref, CGI) %>% 
   pivot_longer(
     cols = matches('^crt[1-6]_[ir]$'),
     names_to = 'item',
@@ -981,7 +999,7 @@ d_crt_long <- d %>%
     problem = as.integer(problem),
     condition = recode(condition, 'i' = 'intuitive', 'r' = 'reflective')
   ) %>%
-  select(participant, problem, condition, response, justification, feedback, Country, culture, evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref)
+  select(participant, problem, condition, response, justification, feedback, Country, culture, evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref, CGI)
 
 # Pivot familiarity data (one value per participant-problem)
 d_fam_long <- d %>%
@@ -1027,7 +1045,7 @@ d_long <- d_crt_long %>%
   # and familiarity and ext_resources_use are duplicated for both.
   select(participant, response, justification, feedback, problem, 
          condition, problem, familiarity, ext_resources_use, dot_accuracy, 
-         Country, culture, evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref)
+         Country, culture, evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref, CGI)
 
 
 
@@ -1057,14 +1075,14 @@ dat_H1 <- d_all_H1 %>%
   filter(accuracy_intuitive == 1 | accuracy_reflective == 1) %>% # keep only correct, either at phase 1 or 2
   filter(!is.na(accuracy_intuitive)) %>% # excluded missing responses in phase 1
   mutate(correct_phase2 = ifelse(accuracy_intuitive == 0, accuracy_reflective, 0)) %>%
-  select(correct_phase2, participant, problem, justification, feedback, Country, culture, evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref)
+  select(correct_phase2, participant, problem, justification, feedback, Country, culture, evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref, CGI)
 
 # and for the other hypotheses 
 dat_Hother <- d_all %>%
   filter(accuracy_intuitive == 0,        # keep only intuitive errors
          ext_resources_use=="No") %>%    # exclude also external resource use
   mutate(corrected = accuracy_reflective) %>%
-  select(corrected, participant, problem, justification, feedback, Country, culture, evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref)
+  select(corrected, participant, problem, justification, feedback, Country, culture, evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref, CGI)
 
 # recode conditions as dummy variables for modelling
 dat_H1$justification <- ifelse(dat_H1$justification=="J", 1, 0)
@@ -1101,6 +1119,8 @@ knitr::kable(mean_accuracy_table,
 #| fig-height: 3
 #| fig-cap: "Probability that a correct decision is made in phase 2 rather than in phase 1 (H1 variable), split by country and culture. Error bars are standard errors between participants in each country."
 #| label: fig-pH1
+
+# matteo note: plot as a function of accuracy in phase1? 
 
 dat_H1 %>%
   filter(feedback==0,
@@ -2219,6 +2239,26 @@ hypothesis_results %>%
 
 ## Exploratory Analyses
 
+### Models with continuous GCI index
+
+```{r, eval = FALSE}
+mH1_cgi <- glmer(correct_phase2 ~ feedback * justification * CGI + 
+   (feedback * justification||Country), 
+   family = binomial("logit"), data = dat_H1, 
+   control = glmerControl(optimizer = "bobyqa", 
+      optCtrl = list(maxfun = 1e5)))
+
+m_cgi <- glmer(corrected ~ feedback * justification * CGI + 
+   (feedback * justification||Country), 
+   family = binomial("logit"), 
+   data = dat_Hother, 
+   control = glmerControl(optimizer = "bobyqa", 
+     optCtrl = list(maxfun = 1e5)))
+
+```
+
+
+
 ### Scales reliability and measurement invariance
 
 Note: for these analyses I have included only countries with N $\ge$ 100.
@@ -2958,40 +2998,40 @@ dat_Hother <- dat_Hother %>%
          IC_VC_wc = scale(IC_VC_wc))
 
 
-# mH1_exploi_v2 <- glmer(
-#   correct_phase2 ~
-#     (feedback * justification) *
-#     (IH_score_wc + # AOT_score_wc +
-#      IC_HI_wc + IC_VI_wc + IC_HC_wc + IC_VC_wc) +
-#     (feedback * justification || Country) +
-#     (1 | problem),
-#   family = binomial("logit"),
-#   data = dat_H1,
-#   control = glmerControl(
-#     optimizer = "bobyqa",
-#     optCtrl = list(maxfun = 1e5)
-#   )
-# )
-# 
-# saveRDS(mH1_exploi_v2, "mH1_exploi_v2.RDS")
-# 
-# m_all_exploi_v2 <- glmer(
-#   corrected ~
-#     (feedback * justification) *
-#     (IH_score_wc + # AOT_score_wc +
-#      IC_HI_wc + IC_VI_wc + IC_HC_wc + IC_VC_wc) +
-#     (feedback * justification || Country) +
-#     (1 | problem),
-#   family = binomial("logit"),
-#   data = dat_Hother,
-#   control = glmerControl(
-#     optimizer = "bobyqa",
-#     optCtrl = list(maxfun = 1e5)
-#   )
-# )
-# 
-# 
-# saveRDS(m_all_exploi_v2, "m_all_exploi_v2.RDS")
+mH1_exploi_v2 <- glmer(
+  correct_phase2 ~
+    (feedback * justification) *
+    (IH_score_wc + # AOT_score_wc +
+     IC_HI_wc + IC_VI_wc + IC_HC_wc + IC_VC_wc) +
+    (feedback * justification || Country) +
+    (1 | problem),
+  family = binomial("logit"),
+  data = dat_H1,
+  control = glmerControl(
+    optimizer = "bobyqa",
+    optCtrl = list(maxfun = 1e5)
+  )
+)
+
+saveRDS(mH1_exploi_v2, "mH1_exploi_v2.RDS")
+
+m_all_exploi_v2 <- glmer(
+  corrected ~
+    (feedback * justification) *
+    (IH_score_wc + # AOT_score_wc +
+     IC_HI_wc + IC_VI_wc + IC_HC_wc + IC_VC_wc) +
+    (feedback * justification || Country) +
+    (1 | problem),
+  family = binomial("logit"),
+  data = dat_Hother,
+  control = glmerControl(
+    optimizer = "bobyqa",
+    optCtrl = list(maxfun = 1e5)
+  )
+)
+
+
+saveRDS(m_all_exploi_v2, "m_all_exploi_v2.RDS")
 
 
 mH1_exploi_v2 <- readRDS("mH1_exploi_v2.RDS")
@@ -3023,6 +3063,18 @@ model_table_2(m_all_exploi_v2, caption="Model for H2-H3, including all individua
 table(d$Sample)
 sum(is.na(d$Sample))
 
+d %>%
+  filter(!is.na(Sample)) %>%
+  group_by(culture, Sample) %>%
+  summarise(N = n())
+# 1 Collectivistic  Chttp://      2
+# 2 Collectivistic  Community  1523
+# 3 Collectivistic  Student    3162
+# 4 Individualistic 234455        1
+# 5 Individualistic 5             4
+# 6 Individualistic Community  2811
+# 7 Individualistic Student    7507
+
 # unique(d$Country[is.na(d$Sample)])
 # unique(d$LabID[is.na(d$Sample)])
 
@@ -3030,6 +3082,54 @@ d %>%
   filter(is.na(Sample)) %>%
   group_by(Country, LabID) %>%
   summarise(N = n())
+# # A tibble: 11 × 3
+# # Groups:   Country [9]
+#    Country     LabID        N
+#    <chr>       <chr>    <int>
+#  1 Bangladesh  NA           3
+#  2 Colombia    3629        29
+#  3 Germany     Sample=S     1
+#  4 Germany     NA           1
+#  5 Italy       3704…        1
+#  6 Italy       NA          39
+#  7 Mexico      15           1
+#  8 Netherlands 381         77
+#  9 Norway      NA          79
+# 10 Serbia      NA           3
+# 11 Spain       3275         1
+
+
+# infer missing from country + LabID
+# First clean the clearly invalid Sample values
+d <- d %>%
+  mutate(
+    Sample = ifelse(
+      Sample %in% c("Student", "Community"),
+      Sample,
+      NA_character_
+    )
+  )
+
+# Infer Sample from Country × LabID
+d <- d %>%
+  group_by(Country, LabID) %>%
+  mutate(
+    # Valid Sample values observed in this Country × LabID
+    n_sample_types = n_distinct(Sample[!is.na(Sample)]),
+
+    # Only infer when exactly one valid type is present
+    sample_inferred = ifelse(
+      n_sample_types == 1,
+      first(na.omit(Sample)),
+      NA_character_
+    ),
+
+    # Fill missing values only
+    Sample = coalesce(Sample, sample_inferred)
+  ) %>%
+  ungroup() %>%
+  select(-n_sample_types, -sample_inferred)
+
 ```
 
 
