@@ -1036,17 +1036,47 @@ dot_correct <- c(3,2,4,2,1, 3)
 d_dot_long <- d_dot_long %>%
   mutate(dot_accuracy = ifelse(dot_response==dot_correct[d_dot_long$problem], 1, 0))
 
+# Pivot trial-by-trial confidence responses
+d_conf_long <- d %>%
+  pivot_longer(
+    cols = matches("^crt[1-6]_[ir]_con$"),
+    names_to = "conf_item",
+    values_to = "confidence"
+  ) %>%
+  extract(
+    conf_item,
+    into = c("problem", "condition"),
+    regex = "^crt([1-6])_([ir])_con$"
+  ) %>%
+  mutate(
+    problem = as.integer(problem),
+    condition = recode(
+      condition,
+      "i" = "intuitive",
+      "r" = "reflective"
+    )
+  ) %>%
+  select(
+    participant,
+    problem,
+    condition,
+    confidence
+  )
+
 # Join everything together
 d_long <- d_crt_long %>%
   left_join(d_fam_long, by = c("participant","problem")) %>%
   left_join(d_ext_long, by = c("participant","problem")) %>%
   left_join(d_dot_long, by = c("participant","problem")) %>%
+  left_join(
+    d_conf_long,
+    by = c("participant", "problem", "condition")
+  ) %>%
   # Now each (participant, problem) has two rows (for each phase),
   # and familiarity and ext_resources_use are duplicated for both.
-  select(participant, response, justification, feedback, problem, 
+  select(participant, response, confidence, justification, feedback, problem, 
          condition, problem, familiarity, ext_resources_use, dot_accuracy, 
          Country, culture, evolution_code, IH_score, AOT_score, IC_HI, IC_VI, IC_HC, IC_VC, GCBS_score, CRS_score, LabID, Sample, calib_int, calib_ref, CGI)
-
 
 
 # compute accuracy
@@ -1058,7 +1088,7 @@ d_long$accuracy <- ifelse(!is.na(d_long$response),
 d_all <- d_long %>%
   pivot_wider(
     names_from = condition,
-    values_from = c(response, accuracy),
+    values_from = c(response, accuracy, confidence),
     names_sep = "_")
 
 write_csv(d_all, "JT003-EC-data-OK-long.csv")
@@ -1535,6 +1565,10 @@ hypothesis_results %>%
   #   width = "3.5cm"
   # )
 ```
+
+
+
+
 
 \newpage
 
@@ -3632,6 +3666,7 @@ ggplot(
 
 ```
 
+
 \newpage
 
 #### Robustness analysis: quasibinomial GAMs
@@ -3969,4 +4004,129 @@ ggplot(
 ```
 
 
+\newpage
+
+
+### Confidence Resolution and Intellectual Humility
+
+```{r}
+# ------------------------------------------------------------
+# Prepare trial-level data
+# ------------------------------------------------------------
+
+# library(mgcv)
+library(gamm4)
+
+# Standardise IH at PARTICIPANT level
+# (avoids participants with more valid trials contributing more
+# to the mean/SD used for standardisation)
+IH_par <- d_long %>%
+  distinct(participant, IH_score) %>%
+  mutate(
+    IH_z = as.numeric(scale(IH_score))
+  ) %>%
+  select(participant, IH_z)
+
+dat_conf <- d_long %>%
+  left_join(IH_par, by = "participant") %>%
+  filter(
+    ext_resources_use == "No",
+    !is.na(confidence),
+    !is.na(accuracy),
+    !is.na(IH_z)
+  ) %>%
+  mutate(
+    correctness = factor(
+      accuracy,
+      levels = c(0, 1),
+      labels = c("Incorrect", "Correct")
+    ),
+    participant = factor(participant),
+    problem = factor(problem)
+)
+
+# Sum-to-zero / deviation contrasts
+contrasts(dat_conf$problem) <- contr.sum(nlevels(dat_conf$problem))
+```
+
+
+```{r}
+# model for intuitive
+
+# dat_int <- dat_conf %>%
+#   filter(condition == "intuitive") %>%
+#   droplevels()
+# 
+# m_conf_int <- bam(
+#   confidence ~
+#     correctness +
+#     s(IH_z, by = correctness, k = 5) +
+#     s(participant, bs = "re") +
+#     s(problem, bs = "re"),
+#   
+#   data = dat_int,
+#   family = gaussian(),
+#   method = "fREML",
+#   discrete = TRUE,
+#   nthreads = 1,
+#   gc.level = 2
+# )
+
+
+
+dat_int <- dat_conf %>%
+  filter(condition == "intuitive") %>%
+  droplevels()
+
+# m_conf_int <- gamm4(
+#   confidence ~
+#     correctness +
+#     s(IH_z, by = correctness, k = 4),
+#   
+#   random = ~
+#     (1 | participant) #+
+#     #(1 | problem)
+#   ,
+#   
+#   data = dat_int,
+#   family = gaussian()
+# )
+
+m_conf_int <- gamm4(
+  confidence ~
+    correctness +
+    problem +
+    s(IH_z, by = correctness, k = 5),
+  
+  random = ~
+    (1 | participant),
+  
+  data = dat_int,
+  family = gaussian()
+)
+
+
+```
+
+```{r}
+# model for reflective
+
+dat_ref <- dat_conf %>%
+  filter(condition == "reflective") %>%
+  mutate(problem = factor(problem)) %>%
+  droplevels()
+
+m_conf_ref <- gamm4(
+  confidence ~
+    correctness +
+    problem +
+    s(IH_z, by = correctness, k = 5),
+
+  random = ~(1 | participant),
+
+  data = dat_ref,
+  family = gaussian()
+)
+
+```
 
