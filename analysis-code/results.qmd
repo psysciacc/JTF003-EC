@@ -15,8 +15,8 @@ format:
   pdf:
     toc: true 
     documentclass: article
-    fontsize: 8pt
-    geometry: "left=1in, right=1in, top=1in, bottom=1in, marginparwidth=2in" 
+    fontsize: 5pt
+    geometry: "left=0.6in, right=0.6in, top=0.8in, bottom=0.8in, marginparwidth=1in" 
     include-in-header: 
       text: |
         \usepackage{unicode-math}
@@ -84,7 +84,7 @@ wb_gdp_snapshot <- readr::read_csv(wb_gdp_path, show_col_types = FALSE)
 wb_provenance <- readr::read_csv(wb_meta_path, show_col_types = FALSE)
 
 v2_inputs <- c("all_withNorway_noTest_countryFill_raw.csv", "GCI.csv",
-               "PSA-JTF3 EC Manuscript.pdf", "update_data_worldbank.m",
+               # "PSA-JTF3 EC Manuscript.pdf", "update_data_worldbank.m",
                wb_country_path, wb_gdp_path, wb_meta_path)
 v2_packages <- c("knitr", "lme4", "mgcv", "gamm4", "lavaan", "dplyr",
                  "tidyr", "ggplot2", "gt", "broom", "broom.mixed", "psych",
@@ -2079,7 +2079,7 @@ The site-adjusted summary shows whether the preregistered conclusions persist af
 
 ### Continuous global collectivism (exploratory)
 
-These models use the country-level Global Collectivism Index (GCI; named `CGI` in the dataset) on its original continuous scale, replacing the binary cultural grouping. Both outcomes include the feedback × justification × GCI interaction and a problem random intercept; country-level random effects retain the specifications in `scrap_continuous_models.R`. Companion models add standardized log GDP per capita as an additive country-level covariate. The GDP adjustment asks whether the GCI associations persist after accounting for national income; it does not estimate a GDP interaction. These are exploratory country-level associations, not individual-level cultural effects. GCI = 0 is the reference for manipulation coefficients; the three-way term tests whether the feedback-by-justification interaction changes with GCI.
+These models use the country-level Global Collectivism Index (GCI; named `CGI` in the dataset) on its original continuous scale, replacing the binary cultural grouping. Both outcomes include the feedback × justification × GCI interaction and a problem random intercept; country-level random effects retain the specifications in `scrap_continuous_models.R`. Companion models add standardized log GDP per capita as an additive country-level covariate. The GDP adjustment asks whether the GCI associations persist after accounting for national income; it does not estimate a GDP interaction. GCI = 0 is the reference for manipulation coefficients; the three-way term tests whether the feedback-by-justification interaction changes with GCI.
 
 ```{r continuous-gci-data}
 gci_H1 <- dat_H1 %>% filter(is.finite(CGI), !is.na(correct_phase2))
@@ -2930,7 +2930,7 @@ model_table_2(mH1_exploi_v2, caption="H1 model with within-country-centred IH an
 model_table_2(m_all_exploi_v2, caption="H2–H3 model with within-country-centred IH and cultural-tendency scores (AOT omitted).")
 ```
 
-Compare these estimates with the preceding pooled-score models: within-country centering changes the target to individual differences relative to each country’s mean. It does not itself establish measurement invariance.
+Compare these estimates with the preceding pooled-score models: within-country centering changes the target to individual differences relative to each country’s mean.
 
 
 \newpage
@@ -3024,7 +3024,7 @@ model_table_2(mH1_explo_sampletype, caption="Model for H1, including sample type
 model_table_2(m_all_explo_sampletype, caption="Model for H2-H3, including sample type (Community vs. Student) as fixed-effect.")
 ```
 
-These models estimate differences in outcomes between Community and Student samples and allow the treatment effects to vary by sample type. They are exploratory comparisons; the sample-label audit above shows how raw labels were cleaned and which values could not be resolved.
+These models estimate differences in outcomes between Community and Student samples and allow the treatment effects to vary by sample type. The sample-label tables above shows how raw labels were cleaned and which values could not be resolved.
 
 
 \newpage
@@ -4291,7 +4291,7 @@ ggplot(
 
 #### Resolution contrasts
 
-A positive contrast means higher confidence for correct than incorrect answers. Separate significant smooths do not themselves establish that resolution varies with IH; the contrast curve and its uncertainty address the difference directly. These exploratory pointwise intervals do not provide a multiplicity-adjusted global test of moderation.
+A positive contrast means higher confidence for correct than incorrect answers. Separate significant smooths do not themselves establish that resolution varies with IH; the contrast curve and its uncertainty address the difference directly.
 
 ```{r confidence-resolution-contrasts}
 v2_resolution <- function(model, data, phase) {
