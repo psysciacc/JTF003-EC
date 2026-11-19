@@ -84,7 +84,6 @@ wb_gdp_snapshot <- readr::read_csv(wb_gdp_path, show_col_types = FALSE)
 wb_provenance <- readr::read_csv(wb_meta_path, show_col_types = FALSE)
 
 v2_inputs <- c("all_withNorway_noTest_countryFill_raw.csv", "GCI.csv",
-               # "PSA-JTF3 EC Manuscript.pdf", "update_data_worldbank.m",
                wb_country_path, wb_gdp_path, wb_meta_path)
 v2_packages <- c("knitr", "lme4", "mgcv", "gamm4", "lavaan", "dplyr",
                  "tidyr", "ggplot2", "gt", "broom", "broom.mixed", "psych",
@@ -228,7 +227,7 @@ Exclusion criteria applied as stated in the [preregistration](https://osf.io/pre
 
 > We will exclude participants who did not complete the study, failed an attention check question, failed to pass the Captcha test (i.e., their Captcha score is equal to or lower than 0.5), or are not permanent residents of the geopolitical region where data collection is taking place.
 
-The exclusion counts are sequential: each row gives the additional participants removed after the preceding criteria. CAPTCHA scores equal to 0.5 are excluded, so the retained sample requires a score strictly above 0.5.
+The exclusion counts are sequential: each row gives the additional participants removed after the preceding criteria. CAPTCHA scores equal to 0.5 are excluded, so the retained sample requires a score strictly above 0.5. The initial sample size, before any exclusions, was `r nrow(d)`.
 
 ```{r v2-chunk-003, echo=FALSE}
 total_initial <- nrow(d)
@@ -257,37 +256,54 @@ remaining_after_residence <- nrow(d %>% filter(Finished == 1,
                                                check==0,
                                                Country_Res_YN =="Yes"))
 
-total_excluded <- total_initial - remaining_after_residence
+excluded_country <- remaining_after_residence - nrow(d %>% filter(
+  Finished == 1,
+  Q_RecaptchaScore > 0.5,
+  check == 0,
+  Country_Res_YN == "Yes",
+  !is.na(Country)
+))
+
+remaining_after_country <- remaining_after_residence - excluded_country
+
+total_excluded <- total_initial - remaining_after_country
 
 summary_table <- data.frame(
-  Criterion = c( "Finished == 1", 
-                 "Q_RecaptchaScore > 0.5", 
-                 "attention check == 0",
-                 "Country_Res_YN == Yes",
-                 "Total"),
-  Excluded = c(excluded_finished, 
-               excluded_recaptcha, 
-               excluded_attcheck,
-               excluded_residence,
-               total_excluded),
-  Fraction = c(excluded_finished/total_initial, 
-               excluded_recaptcha/total_initial, 
-               excluded_attcheck/total_initial,
-               excluded_residence/total_initial, 
-               total_excluded/total_initial),
-  Percentage = c(excluded_finished/total_initial * 100, 
-                 excluded_recaptcha/total_initial * 100, 
-                 excluded_attcheck/total_initial * 100,
-                 excluded_residence/total_initial * 100, 
-                 total_excluded/total_initial * 100)
+  Criterion = c(
+    "Finished == 1",
+    "Q_RecaptchaScore > 0.5",
+    "attention check == 0",
+    "Country_Res_YN == Yes",
+    "`Country` not missing",
+    "Total"
+  ),
+  Excluded = c(
+    excluded_finished,
+    excluded_recaptcha,
+    excluded_attcheck,
+    excluded_residence,
+    excluded_country,
+    total_excluded
+  )
+) %>%
+  mutate(
+    Fraction = Excluded / total_initial,
+    Percentage = Fraction * 100
+  )
+
+kable(
+  summary_table,
+  booktabs = TRUE,
+  digits = c(0, 0, 3, 1),
+  col.names = c(
+    "Exclusion Criterion",
+    "Number Excluded",
+    "Fraction Excluded",
+    "Percentage Excluded"
+  ),
+  caption = "Each line indicates how many participants failed each criterion (applied sequentially)."
 )
 
-kable(summary_table, booktabs = TRUE, 
-      col.names = c("Exclusion Criterion", 
-                    "Number Excluded", 
-                    "Fraction Excluded", 
-                    "Percentage Excluded"), 
-      caption="Each line indicates how many participants failed each criterion (applied sequentially).")
 ```
 
 
@@ -297,7 +313,11 @@ d <- d %>%
          check == 0,
          Q_RecaptchaScore > 0.5,
          Country_Res_YN =="Yes")
+
+d <- d %>%
+  filter(!is.na(Country))
 ```
+
 
 
 ```{r data_preparation,  include=FALSE}
@@ -386,9 +406,6 @@ d <- d %>%
                           "ZB" = "Zimbabwe",
                           "OM" = "Oman")) 
 
-d <- d %>%
-  filter(!is.na(Country))
-
 wb_iso2_alias <- c("|T" = "IT", "ZB" = "ZW", "HK,HK" = "HK",
                    "PH,PH" = "PH", "UK" = "GB")
 country_gdp_lookup <- d %>%
@@ -445,6 +462,35 @@ d <- d %>%
 
 ```
 
+```{r dadd-chunk-001, echo=FALSE}
+d %>%
+  mutate(
+    condition = case_when(
+      feedback == "F"  & justification == "NJ" ~ "feedback",
+      feedback == "NF" & justification == "J"  ~ "justification",
+      feedback == "F"  & justification == "J"  ~ "feedback + justification",
+      .default = "baseline"
+    )
+  ) %>%
+  count(condition, culture) %>%
+  pivot_wider(
+    names_from = culture,
+    values_from = n,
+    values_fill = 0
+  ) %>%
+  mutate(N = rowSums(across(where(is.numeric)))) %>%
+  relocate(N, .after = condition) %>%
+  kable(
+    booktabs = TRUE,
+    caption = "Sample size by experimental condition and cultural group."
+  )
+```
+
+
+\newpage
+
+## Demographic information
+
 ```{r v2-chunk-006, echo=FALSE, message=FALSE, warning=FALSE}
 demographic_summary <- d %>%
   summarise(
@@ -463,7 +509,7 @@ knitr::kable(demographic_summary, booktabs = TRUE,
              col.names = c("Demographic", "Value"))
 ```
 
-The first demographic table summarizes age and reported gender in the retained sample. The next table separates those characteristics by the study’s country-level cultural classification; these are descriptive summaries and do not enter the hypothesis models.
+The first demographic table summarizes age and reported gender in the retained sample. The next table separates those characteristics by the study’s country-level cultural classification.
 
 ```{r v2-chunk-007, echo=FALSE, message=FALSE, warning=FALSE}
 demographic_summary <- d %>%
@@ -571,7 +617,88 @@ education_table %>%
   )
 ```
 
+
+### Language background
+
+Language fluency is summarized only among participants who said the study language was not their native language; the native-language rows use all participants who answered that question.
+```{r v2-chunk-011, echo=FALSE}
+library(gt)
+
+d_lang <- d %>%
+  mutate(
+    lang_fluency_clean = case_when(
+      str_detect(lang_fluency, "^Beginner") ~ "Beginner",
+      str_detect(lang_fluency, "^Intermediate") ~ "Intermediate",
+      str_detect(lang_fluency, "^Advanced") ~ "Advanced",
+      str_detect(lang_fluency, "^Expert/Proficient") ~ "Expert/Proficient",
+      lang_fluency == "Prefer not to respond" ~ "Prefer not to respond",
+      TRUE ~ NA_character_
+    )
+  )
+
+native_summary <- d_lang %>%
+  filter(!is.na(native_lang)) %>%
+  count(response = native_lang) %>%
+  mutate(
+    section = "Native speaker of the study language",
+    denominator = sum(n),
+    percent = 100 * n / denominator
+  )
+
+fluency_summary <- d_lang %>%
+  filter(
+    native_lang == "No",
+    !is.na(lang_fluency_clean)
+  ) %>%
+  count(response = lang_fluency_clean) %>%
+  mutate(
+    section = "Fluency among non-native speakers",
+    denominator = sum(n),
+    percent = 100 * n / denominator
+  )
+
+language_table <- bind_rows(
+  native_summary,
+  fluency_summary
+) %>%
+  mutate(
+    response = factor(
+      response,
+      levels = c(
+        "Yes", "No", "Prefer not to respond",
+        "Beginner", "Intermediate", "Advanced",
+        "Expert/Proficient"
+      )
+    )
+  ) %>%
+  arrange(section, response) %>%
+  select(section, response, n, percent)
+
+language_table %>%
+  gt(groupname_col = "section") %>%
+  cols_label(
+    response = "Response",
+    n = "N",
+    percent = "%"
+  ) %>%
+  fmt_number(
+    columns = percent,
+    decimals = 1
+  ) %>%
+  tab_header(
+    title = "Language background of participants"
+  ) %>%
+  tab_source_note(
+    source_note = paste(
+      "Fluency was assessed only among participants who reported",
+      "that the study language was not their native language."
+    )
+  )
+```
+
 \newpage
+
+## Descriptive Statistics
 
 ### Use of external resources
 
@@ -715,88 +842,11 @@ d %>%
       "Percentage and number of participants reporting familiarity,",
       "split by problem and condition."
     )
-  ) # %>%
+  ) 
 ```
 
 \newpage
 
-### Language background
-
-Language fluency is summarized only among participants who said the study language was not their native language; the native-language rows use all participants who answered that question.
-```{r v2-chunk-011, echo=FALSE}
-library(gt)
-
-d_lang <- d %>%
-  mutate(
-    lang_fluency_clean = case_when(
-      str_detect(lang_fluency, "^Beginner") ~ "Beginner",
-      str_detect(lang_fluency, "^Intermediate") ~ "Intermediate",
-      str_detect(lang_fluency, "^Advanced") ~ "Advanced",
-      str_detect(lang_fluency, "^Expert/Proficient") ~ "Expert/Proficient",
-      lang_fluency == "Prefer not to respond" ~ "Prefer not to respond",
-      TRUE ~ NA_character_
-    )
-  )
-
-native_summary <- d_lang %>%
-  filter(!is.na(native_lang)) %>%
-  count(response = native_lang) %>%
-  mutate(
-    section = "Native speaker of the study language",
-    denominator = sum(n),
-    percent = 100 * n / denominator
-  )
-
-fluency_summary <- d_lang %>%
-  filter(
-    native_lang == "No",
-    !is.na(lang_fluency_clean)
-  ) %>%
-  count(response = lang_fluency_clean) %>%
-  mutate(
-    section = "Fluency among non-native speakers",
-    denominator = sum(n),
-    percent = 100 * n / denominator
-  )
-
-language_table <- bind_rows(
-  native_summary,
-  fluency_summary
-) %>%
-  mutate(
-    response = factor(
-      response,
-      levels = c(
-        "Yes", "No", "Prefer not to respond",
-        "Beginner", "Intermediate", "Advanced",
-        "Expert/Proficient"
-      )
-    )
-  ) %>%
-  arrange(section, response) %>%
-  select(section, response, n, percent)
-
-language_table %>%
-  gt(groupname_col = "section") %>%
-  cols_label(
-    response = "Response",
-    n = "N",
-    percent = "%"
-  ) %>%
-  fmt_number(
-    columns = percent,
-    decimals = 1
-  ) %>%
-  tab_header(
-    title = "Language background of participants"
-  ) %>%
-  tab_source_note(
-    source_note = paste(
-      "Fluency was assessed only among participants who reported",
-      "that the study language was not their native language."
-    )
-  )
-```
 
 ```{r data_preparation_2, include=FALSE}
 d <- d %>%
@@ -1097,6 +1147,149 @@ dat_Hother$justification <- ifelse(dat_Hother$justification=="J", 1, 0)
 dat_Hother$feedback <- ifelse(dat_Hother$feedback=="F", 1, 0)
 ```
 
+
+<!-- Add new descriptives requested by Miro here -->
+
+### Pooled response pattern counts (H2/H3 exclusion criteria)
+
+```{r dadd-chunk-002, echo=FALSE}
+d_desc <- d_all %>%
+  filter(ext_resources_use=="No")  %>%
+  mutate(
+    Condition = case_when(
+      feedback == "NF" & justification == "NJ" ~ "Control",
+      feedback == "F"  & justification == "NJ" ~ "Feedback",
+      feedback == "NF" & justification == "J"  ~ "Justification",
+      feedback == "F"  & justification == "J"  ~ "Feedback + justification"
+    )
+  )
+
+summarise_patterns <- function(x) {
+  x %>%
+    summarise(
+      N = n(),
+      `Correct → Correct` = sum(accuracy_intuitive == 1 & accuracy_reflective == 1, na.rm = TRUE),
+      `Correct → Incorrect` = sum(accuracy_intuitive == 1 & accuracy_reflective == 0, na.rm = TRUE),
+      `Incorrect → Correct` = sum(accuracy_intuitive == 0 & accuracy_reflective == 1, na.rm = TRUE),
+      `Incorrect → Incorrect` = sum(accuracy_intuitive == 0 & accuracy_reflective == 0, na.rm = TRUE),
+      Missing = sum(is.na(accuracy_intuitive) | is.na(accuracy_reflective)),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      `% correct via correction` = round(
+        100 * `Incorrect → Correct` /
+          (`Correct → Correct` + `Incorrect → Correct`), 1
+      )
+    )
+}
+
+h23_descriptives <- bind_rows(
+  d_desc %>%
+    group_by(Condition) %>%
+    summarise_patterns(),
+  
+  d_desc %>%
+    summarise_patterns() %>%
+    mutate(Condition = "Overall")
+)
+
+knitr::kable(h23_descriptives, digits = 1)
+```
+
+```{r dadd-chunk-003, echo=FALSE}
+#| results: asis
+
+for (cult in c("Individualistic", "Collectivistic")) {
+
+  d_cult <- d_desc %>%
+    filter(culture == cult)
+
+  h1_descriptives <- bind_rows(
+    d_cult %>%
+      group_by(Condition) %>%
+      summarise_patterns(),
+
+    d_cult %>%
+      summarise_patterns() %>%
+      mutate(Condition = "Overall")
+  )
+
+  cat("\n\n###", cult, "\n\n")
+
+  print(
+    knitr::kable(
+      h1_descriptives,
+      digits = 1,
+      booktabs = TRUE,
+      caption = paste("H1 response patterns —", cult, "countries")
+    )
+  )
+
+  cat("\n\n")
+}
+```
+
+### Pooled response pattern counts (H1 exclusion criteria)
+
+```{r dadd-chunk-004, echo=FALSE}
+d_desc_H1 <- d_all_H1 %>%
+  mutate(
+    Condition = case_when(
+      feedback == "NF" & justification == "NJ" ~ "Control",
+      feedback == "F"  & justification == "NJ" ~ "Feedback",
+      feedback == "NF" & justification == "J"  ~ "Justification",
+      feedback == "F"  & justification == "J"  ~ "Feedback + justification"
+    )
+  )
+
+
+h1_descriptives <- bind_rows(
+  d_desc_H1 %>%
+    group_by(Condition) %>%
+    summarise_patterns(),
+  
+  d_desc %>%
+    summarise_patterns() %>%
+    mutate(Condition = "Overall")
+)
+
+knitr::kable(h1_descriptives, digits = 1)
+```
+
+```{r dadd-chunk-005, echo=FALSE}
+#| results: asis
+
+for (cult in c("Individualistic", "Collectivistic")) {
+
+  d_cult <- d_desc_H1 %>%
+    filter(culture == cult)
+
+  h1_descriptives <- bind_rows(
+    d_cult %>%
+      group_by(Condition) %>%
+      summarise_patterns(),
+
+    d_cult %>%
+      summarise_patterns() %>%
+      mutate(Condition = "Overall")
+  )
+
+  cat("\n\n###", cult, "\n\n")
+
+  print(
+    knitr::kable(
+      h1_descriptives,
+      digits = 1,
+      booktabs = TRUE,
+      caption = paste("H1 response patterns —", cult, "countries")
+    )
+  )
+
+  cat("\n\n")
+}
+```
+
+
 \newpage
 
 ## Confirmatory Analyses
@@ -1187,16 +1380,19 @@ models <- list(mH1_i, mH1_c)
 names <- c("Individualistic", "Collectivistic")
 H1b_pvals <- numeric(length(models))
 H1b_results <- numeric(length(models))
+z_H1b <- numeric(length(models))
  
 for (i in 1:length(models)) {
   b <- fixef(models[[i]])["(Intercept)"]
   SE <- sqrt(diag(vcov(models[[i]]))["(Intercept)"])
   z <- b / SE
   p_value <- pnorm(z) # left-tailed test
+  z_H1b[i] <- z
   H1b_pvals[i] <- p_value
   H1b_results[i] <- ifelse(p_value < alpha, 1, 0)
 }
 
+names(z_H1b) <- names
 names(H1b_pvals) <- names
 names(H1b_results) <- names
 
@@ -1320,16 +1516,19 @@ models <- list(m_i, m_c)
 names <- c("Individualistic", "Collectivistic")
 H2b_pvals <- numeric(length(models))
 H2b_results <- numeric(length(models))
+z_H2b <- numeric(length(models))
  
 for (i in 1:length(models)) {
   b <- fixef(models[[i]])["feedback"]
   SE <- sqrt(diag(vcov(models[[i]]))["feedback"])
   z <- b / SE
   p_value <- 1 - pnorm(z) # right-tailed test
+  z_H2b[i] <- z
   H2b_pvals[i] <- p_value
   H2b_results[i] <- ifelse(p_value < alpha, 1, 0)
 }
 
+names(z_H2b) <- names
 names(H2b_pvals) <- names
 names(H2b_results) <- names
 
@@ -1345,16 +1544,19 @@ models <- list(m_i, m_c)
 names <- c("Individualistic", "Collectivistic")
 H3b_pvals <- numeric(length(models))
 H3b_results <- numeric(length(models))
+z_H3b <- numeric(length(models))
  
 for (i in 1:length(models)) {
   b <- fixef(models[[i]])["justification"]
   SE <- sqrt(diag(vcov(models[[i]]))["justification"])
   z <- b / SE
   p_value <- 1 - pnorm(z) # right-tailed test
+  z_H3b[i] <- z
   H3b_pvals[i] <- p_value
   H3b_results[i] <- ifelse(p_value < alpha, 1, 0)
 }
  
+names(z_H3b) <- names
 names(H3b_pvals) <- names
 names(H3b_results) <- names
 ```
@@ -1437,11 +1639,27 @@ format_p <- function(p, digits = 3) {
   )
 }
 
+format_z <- function(z, digits = 2) {
+  case_when(
+    is.na(z)  ~ NA_character_,
+    TRUE      ~ sprintf(paste0("%.", digits, "f"), z)
+  )
+}
+
 format_culture_p <- function(p) {
   paste0(
     names(p),
     " = ",
     format_p(unname(p)),
+    collapse = "; "
+  )
+}
+
+format_culture_z <- function(z) {
+  paste0(
+    names(z),
+    " = ",
+    format_z(unname(z)),
     collapse = "; "
   )
 }
@@ -1456,36 +1674,42 @@ H3a_supported <- H3a == 1
 H3b_supported <- all(H3b_results == 1)
 
 hypothesis_results <- tribble(
-  ~Hypothesis, ~Prediction, ~Supported, ~`p-value(s)`,
+  ~Hypothesis, ~Prediction, ~Supported, ~`Wald Z`, ~`p-value(s)`,
 
   "H1a",
   "Less than half of correct answers will arise from error correction during deliberation",
   H1a_supported,
+  format_z(z_H1a),
   format_p(p_value_H1a),
 
   "H1b",
   "Baseline performance is below 50% in both cultural groups",
   H1b_supported,
+  format_culture_z(z_H1b),
   format_culture_p(H1b_pvals),
 
   "H2a",
   "Feedback increases correction overall",
   H2a_supported,
+  format_z(z_H2a),
   format_p(p_value_H2a),
 
   "H2b",
   "Feedback increases correction in both cultural groups",
   H2b_supported,
+  format_culture_z(z_H2b),
   format_culture_p(H2b_pvals),
 
   "H3a",
   "Justification increases correction overall",
   H3a_supported,
+  format_z(z_H3a),
   format_p(p_value_H3a),
 
   "H3b",
   "Justification increases correction in both cultural groups",
   H3b_supported,
+  format_culture_z(z_H3b),
   format_culture_p(H3b_pvals)
 ) %>%
   mutate(
