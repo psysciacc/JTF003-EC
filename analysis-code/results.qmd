@@ -1561,14 +1561,57 @@ names(H3b_pvals) <- names
 names(H3b_results) <- names
 ```
 
+The condition tables report model-estimated proportions from the fixed effects, with random effects set to zero. The 95% confidence intervals are pointwise Wald intervals calculated on the logit scale and transformed back to probabilities; they quantify uncertainty in the fixed-effect predictions, rather than variation across countries, problems, or sites. For H1, the outcome is first becoming correct in the reflective phase among trials correct in either phase. For H2/H3, it is correcting an initially incorrect response.
+
+```{r condition-probability-helpers, include=FALSE}
+model_condition_probabilities <- function(model) {
+  # Explicitly retain both levels of the numeric 0/1 treatment predictors.
+  # Use the fitted model frame so the estimates use this model's analysis sample.
+  emm <- emmeans::emmeans(
+    model, ~ feedback * justification,
+    at = list(feedback = c(0, 1), justification = c(0, 1)),
+    data = model.frame(model), df = Inf
+  )
+  as.data.frame(confint(emm, level = 0.95, type = "response", adjust = "none")) %>%
+    arrange(justification, feedback) %>%
+    transmute(
+      Condition = case_when(
+        feedback == 0 & justification == 0 ~ "Control",
+        feedback == 1 & justification == 0 ~ "Feedback only",
+        feedback == 0 & justification == 1 ~ "Justification only",
+        feedback == 1 & justification == 1 ~ "Feedback and justification"
+      ),
+      estimate = prob,
+      lower = asymp.LCL,
+      upper = asymp.UCL
+    )
+}
+
+model_probability_table <- function(model, caption) {
+  model_condition_probabilities(model) %>%
+    transmute(
+      Condition,
+      `Estimated proportion` = sprintf("%.2f", estimate),
+      `95% CI` = sprintf("[%.2f, %.2f]", lower, upper)
+    ) %>%
+    knitr::kable(booktabs = TRUE, align = c("l", "r", "c"), caption = caption)
+}
+```
+
 ```{r v2-chunk-017}
 
 model_table(mH1_all, caption="Model for H1a.")
+
+model_probability_table(mH1_all, caption="Model-estimated proportions and 95% CIs: Model for H1a.")
 ```
 
 ```{r v2-chunk-018}
 model_table(mH1_i, caption="Model for H1b; individualistic countries.")
+
+model_probability_table(mH1_i, caption="Model-estimated proportions and 95% CIs: Model for H1b; individualistic countries.")
 model_table(mH1_c, caption="Model for H1b; collectivistic countries.")
+
+model_probability_table(mH1_c, caption="Model-estimated proportions and 95% CIs: Model for H1b; collectivistic countries.")
 ```
 
 The H1 models estimate the preregistered probability outcomes with country-varying manipulation effects. The hypothesis summary combines the overall test with the requirement that the directional result also appear in both cultural groups.
@@ -1581,11 +1624,17 @@ The observed correction probabilities by country, culture, and treatment conditi
 
 ```{r v2-chunk-019}
 model_table(m_all, caption="Model for H2a and H3a.")
+
+model_probability_table(m_all, caption="Model-estimated proportions and 95% CIs: Model for H2a and H3a.")
 ```
 
 ```{r v2-chunk-020}
 model_table(m_i, caption="Model for H2b and H3b; individualistic countries.")
+
+model_probability_table(m_i, caption="Model-estimated proportions and 95% CIs: Model for H2b and H3b; individualistic countries.")
 model_table(m_c, caption="Model for H2b and H3b; collectivistic countries.")
+
+model_probability_table(m_c, caption="Model-estimated proportions and 95% CIs: Model for H2b and H3b; collectivistic countries.")
 ```
 
 The models test feedback and justification effects on the probability of correcting an initially incorrect intuitive response in the reflective phase. The coefficient tables report the overall estimates and then the country-group estimates; the hypothesis summary below translates the preregistered one-tailed tests into supported/not-supported outcomes.
@@ -1776,16 +1825,19 @@ models <- list(mH1_i, mH1_c)
 names <- c("Individualistic", "Collectivistic")
 H1b_pvals <- numeric(length(models))
 H1b_results <- numeric(length(models))
+z_H1b <- numeric(length(models))
  
 for (i in 1:length(models)) {
   b <- fixef(models[[i]])["(Intercept)"]
   SE <- sqrt(diag(vcov(models[[i]]))["(Intercept)"])
   z <- b / SE
   p_value <- pnorm(z) # left-tailed test
+  z_H1b[i] <- z
   H1b_pvals[i] <- p_value
   H1b_results[i] <- ifelse(p_value < alpha, 1, 0)
 }
 
+names(z_H1b) <- names
 names(H1b_pvals) <- names
 names(H1b_results) <- names
 
@@ -1908,16 +1960,19 @@ models <- list(m_i, m_c)
 names <- c("Individualistic", "Collectivistic")
 H2b_pvals <- numeric(length(models))
 H2b_results <- numeric(length(models))
+z_H2b <- numeric(length(models))
  
 for (i in 1:length(models)) {
   b <- fixef(models[[i]])["feedback"]
   SE <- sqrt(diag(vcov(models[[i]]))["feedback"])
   z <- b / SE
   p_value <- 1 - pnorm(z) # right-tailed test
+  z_H2b[i] <- z
   H2b_pvals[i] <- p_value
   H2b_results[i] <- ifelse(p_value < alpha, 1, 0)
 }
 
+names(z_H2b) <- names
 names(H2b_pvals) <- names
 names(H2b_results) <- names
 
@@ -1933,16 +1988,19 @@ models <- list(m_i, m_c)
 names <- c("Individualistic", "Collectivistic")
 H3b_pvals <- numeric(length(models))
 H3b_results <- numeric(length(models))
+z_H3b <- numeric(length(models))
  
 for (i in 1:length(models)) {
   b <- fixef(models[[i]])["justification"]
   SE <- sqrt(diag(vcov(models[[i]]))["justification"])
   z <- b / SE
   p_value <- 1 - pnorm(z) # right-tailed test
+  z_H3b[i] <- z
   H3b_pvals[i] <- p_value
   H3b_results[i] <- ifelse(p_value < alpha, 1, 0)
 }
  
+names(z_H3b) <- names
 names(H3b_pvals) <- names
 names(H3b_results) <- names
 ```
@@ -1952,22 +2010,34 @@ names(H3b_results) <- names
 ```{r v2-chunk-024}
 
 model_table_2(mH1_all, caption="Model for H1a (model with random intercepts for CRT problem).")
+
+model_probability_table(mH1_all, caption="Model-estimated proportions and 95% CIs: Model for H1a (model with random intercepts for CRT problem).")
 ```
 
 ```{r v2-chunk-025}
 model_table_2(mH1_i, caption="Model for H1b (model with random intercepts for CRT problem); individualistic countries.")
+
+model_probability_table(mH1_i, caption="Model-estimated proportions and 95% CIs: Model for H1b (model with random intercepts for CRT problem); individualistic countries.")
 model_table_2(mH1_c, caption="Model for H1b (model with random intercepts for CRT problem); collectivistic countries.")
+
+model_probability_table(mH1_c, caption="Model-estimated proportions and 95% CIs: Model for H1b (model with random intercepts for CRT problem); collectivistic countries.")
 ```
 
 \newpage
 
 ```{r v2-chunk-026}
 model_table_2(m_all, caption="Model for H2a and H3a (model with random intercepts for CRT problem).")
+
+model_probability_table(m_all, caption="Model-estimated proportions and 95% CIs: Model for H2a and H3a (model with random intercepts for CRT problem).")
 ```
 
 ```{r v2-chunk-027}
 model_table_2(m_i, caption="Model for H2b and H3b (model with random intercepts for CRT problem); individualistic countries.")
+
+model_probability_table(m_i, caption="Model-estimated proportions and 95% CIs: Model for H2b and H3b (model with random intercepts for CRT problem); individualistic countries.")
 model_table_2(m_c, caption="Model for H2b and H3b (model with random intercepts for CRT problem); collectivistic countries.")
+
+model_probability_table(m_c, caption="Model-estimated proportions and 95% CIs: Model for H2b and H3b (model with random intercepts for CRT problem); collectivistic countries.")
 ```
 
 \newpage
@@ -1992,6 +2062,22 @@ format_culture_p <- function(p) {
   )
 }
 
+format_z <- function(z, digits = 2) {
+  case_when(
+    is.na(z)  ~ NA_character_,
+    TRUE      ~ sprintf(paste0("%.", digits, "f"), z)
+  )
+}
+
+format_culture_z <- function(z) {
+  paste0(
+    names(z),
+    " = ",
+    format_z(unname(z)),
+    collapse = "; "
+  )
+}
+
 H1a_supported <- H1a == 1
 H1b_supported <- all(H1b_results == 1)
 
@@ -2002,36 +2088,42 @@ H3a_supported <- H3a == 1
 H3b_supported <- all(H3b_results == 1)
 
 hypothesis_results <- tribble(
-  ~Hypothesis, ~Prediction, ~Supported, ~`p-value(s)`,
+  ~Hypothesis, ~Prediction, ~Supported, ~`Wald Z`, ~`p-value(s)`,
 
   "H1a",
   "Less than half of correct answers will arise from error correction during deliberation",
   H1a_supported,
+  format_z(z_H1a),
   format_p(p_value_H1a),
 
   "H1b",
   "Baseline performance is below 50% in both cultural groups",
   H1b_supported,
+  format_culture_z(z_H1b),
   format_culture_p(H1b_pvals),
 
   "H2a",
   "Feedback increases correction overall",
   H2a_supported,
+  format_z(z_H2a),
   format_p(p_value_H2a),
 
   "H2b",
   "Feedback increases correction in both cultural groups",
   H2b_supported,
+  format_culture_z(z_H2b),
   format_culture_p(H2b_pvals),
 
   "H3a",
   "Justification increases correction overall",
   H3a_supported,
+  format_z(z_H3a),
   format_p(p_value_H3a),
 
   "H3b",
   "Justification increases correction in both cultural groups",
   H3b_supported,
+  format_culture_z(z_H3b),
   format_culture_p(H3b_pvals)
 ) %>%
   mutate(
@@ -2045,7 +2137,7 @@ hypothesis_results <- tribble(
 hypothesis_results %>%
   kable(
     booktabs = TRUE,
-    align = c("l", "l", "c", "l"),
+    align = c("l", "l", "c", "l", "l"),
     caption = paste(
       "Summary of preregistered hypothesis tests after including",
       "by-problem random intercepts"
@@ -2095,16 +2187,19 @@ models <- list(mH1_i, mH1_c)
 names <- c("Individualistic", "Collectivistic")
 H1b_pvals <- numeric(length(models))
 H1b_results <- numeric(length(models))
+z_H1b <- numeric(length(models))
  
 for (i in 1:length(models)) {
   b <- fixef(models[[i]])["(Intercept)"]
   SE <- sqrt(diag(vcov(models[[i]]))["(Intercept)"])
   z <- b / SE
   p_value <- pnorm(z) # left-tailed test
+  z_H1b[i] <- z
   H1b_pvals[i] <- p_value
   H1b_results[i] <- ifelse(p_value < alpha, 1, 0)
 }
 
+names(z_H1b) <- names
 names(H1b_pvals) <- names
 names(H1b_results) <- names
 
@@ -2149,16 +2244,19 @@ models <- list(m_i, m_c)
 names <- c("Individualistic", "Collectivistic")
 H2b_pvals <- numeric(length(models))
 H2b_results <- numeric(length(models))
+z_H2b <- numeric(length(models))
  
 for (i in 1:length(models)) {
   b <- fixef(models[[i]])["feedback"]
   SE <- sqrt(diag(vcov(models[[i]]))["feedback"])
   z <- b / SE
   p_value <- 1 - pnorm(z) # right-tailed test
+  z_H2b[i] <- z
   H2b_pvals[i] <- p_value
   H2b_results[i] <- ifelse(p_value < alpha, 1, 0)
 }
 
+names(z_H2b) <- names
 names(H2b_pvals) <- names
 names(H2b_results) <- names
 
@@ -2174,16 +2272,19 @@ models <- list(m_i, m_c)
 names <- c("Individualistic", "Collectivistic")
 H3b_pvals <- numeric(length(models))
 H3b_results <- numeric(length(models))
+z_H3b <- numeric(length(models))
  
 for (i in 1:length(models)) {
   b <- fixef(models[[i]])["justification"]
   SE <- sqrt(diag(vcov(models[[i]]))["justification"])
   z <- b / SE
   p_value <- 1 - pnorm(z) # right-tailed test
+  z_H3b[i] <- z
   H3b_pvals[i] <- p_value
   H3b_results[i] <- ifelse(p_value < alpha, 1, 0)
 }
  
+names(z_H3b) <- names
 names(H3b_pvals) <- names
 names(H3b_results) <- names
 ```
@@ -2193,22 +2294,34 @@ names(H3b_results) <- names
 ```{r v2-chunk-031}
 
 model_table_2(mH1_all, caption="Model for H1a (model with random intercepts for participating site).")
+
+model_probability_table(mH1_all, caption="Model-estimated proportions and 95% CIs: Model for H1a (model with random intercepts for participating site).")
 ```
 
 ```{r v2-chunk-032}
 model_table_2(mH1_i, caption="Model for H1b (model with random intercepts for participating site); individualistic countries.")
+
+model_probability_table(mH1_i, caption="Model-estimated proportions and 95% CIs: Model for H1b (model with random intercepts for participating site); individualistic countries.")
 model_table_2(mH1_c, caption="Model for H1b (model with random intercepts for participating site); collectivistic countries.")
+
+model_probability_table(mH1_c, caption="Model-estimated proportions and 95% CIs: Model for H1b (model with random intercepts for participating site); collectivistic countries.")
 ```
 
 \newpage
 
 ```{r v2-chunk-033}
 model_table_2(m_all, caption="Model for H2a and H3a (model with random intercepts for participating site).")
+
+model_probability_table(m_all, caption="Model-estimated proportions and 95% CIs: Model for H2a and H3a (model with random intercepts for participating site).")
 ```
 
 ```{r v2-chunk-034}
 model_table_2(m_i, caption="Model for H2b and H3b (model with random intercepts for participating site); individualistic countries.")
+
+model_probability_table(m_i, caption="Model-estimated proportions and 95% CIs: Model for H2b and H3b (model with random intercepts for participating site); individualistic countries.")
 model_table_2(m_c, caption="Model for H2b and H3b (model with random intercepts for participating site); collectivistic countries.")
+
+model_probability_table(m_c, caption="Model-estimated proportions and 95% CIs: Model for H2b and H3b (model with random intercepts for participating site); collectivistic countries.")
 ```
 
 \newpage
@@ -2233,6 +2346,22 @@ format_culture_p <- function(p) {
   )
 }
 
+format_z <- function(z, digits = 2) {
+  case_when(
+    is.na(z)  ~ NA_character_,
+    TRUE      ~ sprintf(paste0("%.", digits, "f"), z)
+  )
+}
+
+format_culture_z <- function(z) {
+  paste0(
+    names(z),
+    " = ",
+    format_z(unname(z)),
+    collapse = "; "
+  )
+}
+
 H1a_supported <- H1a == 1
 H1b_supported <- all(H1b_results == 1)
 
@@ -2243,36 +2372,42 @@ H3a_supported <- H3a == 1
 H3b_supported <- all(H3b_results == 1)
 
 hypothesis_results <- tribble(
-  ~Hypothesis, ~Prediction, ~Supported, ~`p-value(s)`,
+  ~Hypothesis, ~Prediction, ~Supported, ~`Wald Z`, ~`p-value(s)`,
 
   "H1a",
   "Less than half of correct answers will arise from error correction during deliberation",
   H1a_supported,
+  format_z(z_H1a),
   format_p(p_value_H1a),
 
   "H1b",
   "Baseline performance is below 50% in both cultural groups",
   H1b_supported,
+  format_culture_z(z_H1b),
   format_culture_p(H1b_pvals),
 
   "H2a",
   "Feedback increases correction overall",
   H2a_supported,
+  format_z(z_H2a),
   format_p(p_value_H2a),
 
   "H2b",
   "Feedback increases correction in both cultural groups",
   H2b_supported,
+  format_culture_z(z_H2b),
   format_culture_p(H2b_pvals),
 
   "H3a",
   "Justification increases correction overall",
   H3a_supported,
+  format_z(z_H3a),
   format_p(p_value_H3a),
 
   "H3b",
   "Justification increases correction in both cultural groups",
   H3b_supported,
+  format_culture_z(z_H3b),
   format_culture_p(H3b_pvals)
 ) %>%
   mutate(
@@ -2286,7 +2421,7 @@ hypothesis_results <- tribble(
 hypothesis_results %>%
   kable(
     booktabs = TRUE,
-    align = c("l", "l", "c", "l"),
+    align = c("l", "l", "c", "l", "l"),
     caption = paste(
       "Summary of preregistered hypothesis tests after including",
       "by-problem random intercepts"
