@@ -1180,6 +1180,14 @@ summarise_patterns <- function(x) {
         100 * `Incorrect → Correct` /
           (`Correct → Correct` + `Incorrect → Correct`), 1
       )
+    ) %>%
+    mutate(
+      across(
+        c(`Correct → Correct`, `Correct → Incorrect`,
+          `Incorrect → Correct`, `Incorrect → Incorrect`, Missing),
+        ~ sprintf("%.0f (%.1f%%)", .x,
+                  if_else(N > 0, 100 * .x / N, NA_real_))
+      )
     )
 }
 
@@ -1248,7 +1256,7 @@ h1_descriptives <- bind_rows(
     group_by(Condition) %>%
     summarise_patterns(),
   
-  d_desc %>%
+  d_desc_H1 %>%
     summarise_patterns() %>%
     mutate(Condition = "Overall")
 )
