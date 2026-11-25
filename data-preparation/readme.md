@@ -11,3 +11,5 @@ There are several scripts, to be executed in order as documented in the main scr
 3. `fill_in_country.R` Fill in missing country values by cross-checking 
 
 At the end of hte script the cleaned dataset is copied in the `analysis-code`  folder
+
+- Codebook for the resulting dataset: `../analysis-code/codebook_full_data.xlsx`
