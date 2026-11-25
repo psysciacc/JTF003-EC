@@ -8,8 +8,8 @@ Error correction across cultures (PSA JTF003-EC).
 | `translations/` | Translated materials, one file per language |
 | `ethics/` | Ethics approvals and documentation |
 | `pilots/` | Pilot studies |
-| `pre-test/` | Manipulation and reading-time pretests |
-| `manipulation-check/` | Manipulation pretest analysis |
+| `manipulation-check/` | Manipulation pretest: questionnaire, data, codebook, analysis |
+| `reading-pretest/` | Reading-time pretest: questionnaire, data, codebook, analysis |
 | `power-analyses/` | Simulation-based power analyses |
 | `data-preparation/` | Scripts that build the analysis dataset |
 | `analysis-code/` | Analyses, results, figures, full-data codebook |
