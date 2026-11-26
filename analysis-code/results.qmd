@@ -1412,7 +1412,8 @@ model_table <- function(model, caption = NULL, group = "Country",
   tab_fixed <- broom.mixed::tidy(
     model,
     effects = "fixed",
-    conf.int = TRUE
+    conf.int = TRUE,
+    conf.method = "Wald"
   )
 
   if (!is.null(term_labels)) {
@@ -1428,6 +1429,11 @@ model_table <- function(model, caption = NULL, group = "Country",
       `95% CI` = sprintf(
         paste0("[%.", digits, "f, %.", digits, "f]"),
         conf.low, conf.high
+      ),
+      `Odds ratio` = sprintf(paste0("%.", digits, "f"), exp(estimate)),
+      `OR 95% CI` = sprintf(
+        paste0("[%.", digits, "f, %.", digits, "f]"),
+        exp(conf.low), exp(conf.high)
       ),
       `p-value` = case_when(
         p.value < .001 ~ "< .001",
@@ -1452,6 +1458,8 @@ model_table <- function(model, caption = NULL, group = "Country",
       Estimate = sprintf(paste0("%.", digits, "f"), sdcor),
       SE = "",
       `95% CI` = "",
+      `Odds ratio` = "",
+      `OR 95% CI` = "",
       `p-value` = ""
     )
 
@@ -1468,6 +1476,8 @@ model_table <- function(model, caption = NULL, group = "Country",
     Estimate = c(as.character(n), as.character(n_groups)),
     SE = "",
     `95% CI` = "",
+    `Odds ratio` = "",
+    `OR 95% CI` = "",
     `p-value` = ""
   )
 
@@ -1478,7 +1488,7 @@ model_table <- function(model, caption = NULL, group = "Country",
   ) %>%
     knitr::kable(
       caption = caption,
-      align = c("l", "r", "r", "c", "r")
+      align = c("l", "r", "r", "c", "r", "c", "r")
     )
 }
 
@@ -1568,6 +1578,8 @@ names(z_H3b) <- names
 names(H3b_pvals) <- names
 names(H3b_results) <- names
 ```
+
+The coefficient tables retain log-odds estimates and add exponentiated coefficients with 95% Wald confidence intervals. For the feedback and justification terms, these are odds ratios when the other manipulation is absent. The exponentiated intercept is the baseline odds, and the exponentiated interaction is a ratio of odds ratios. Random-effect standard deviations remain on the logit scale. Coefficient-table p-values are two-sided; the hypothesis summaries use the directional tests specified for each hypothesis.
 
 The condition tables report model-estimated proportions from the fixed effects, with random effects set to zero. The 95% confidence intervals are pointwise Wald intervals calculated on the logit scale and transformed back to probabilities; they quantify uncertainty in the fixed-effect predictions, rather than variation across countries, problems, or sites. For H1, the outcome is first becoming correct in the reflective phase among trials correct in either phase. For H2/H3, it is correcting an initially incorrect response.
 
@@ -1857,7 +1869,8 @@ model_table_2 <- function(model, caption = NULL,
   tab_fixed <- broom.mixed::tidy(
     model,
     effects = "fixed",
-    conf.int = TRUE
+    conf.int = TRUE,
+    conf.method = "Wald"
   )
 
   if (!is.null(term_labels)) {
@@ -1873,6 +1886,11 @@ model_table_2 <- function(model, caption = NULL,
       `95% CI` = sprintf(
         paste0("[%.", digits, "f, %.", digits, "f]"),
         conf.low, conf.high
+      ),
+      `Odds ratio` = sprintf(paste0("%.", digits, "f"), exp(estimate)),
+      `OR 95% CI` = sprintf(
+        paste0("[%.", digits, "f, %.", digits, "f]"),
+        exp(conf.low), exp(conf.high)
       ),
       `p-value` = case_when(
         p.value < .001 ~ "< .001",
@@ -1897,6 +1915,8 @@ model_table_2 <- function(model, caption = NULL,
       Estimate = sprintf(paste0("%.", digits, "f"), sdcor),
       SE = "",
       `95% CI` = "",
+      `Odds ratio` = "",
+      `OR 95% CI` = "",
       `p-value` = ""
     )
 
@@ -1915,6 +1935,8 @@ model_table_2 <- function(model, caption = NULL,
     ),
     SE = "",
     `95% CI` = "",
+    `Odds ratio` = "",
+    `OR 95% CI` = "",
     `p-value` = ""
   )
 
@@ -1925,7 +1947,7 @@ model_table_2 <- function(model, caption = NULL,
   ) %>%
     knitr::kable(
       caption = caption,
-      align = c("l", "r", "r", "c", "r")
+      align = c("l", "r", "r", "c", "r", "c", "r")
     )
 }
 
@@ -2439,6 +2461,191 @@ hypothesis_results %>%
 
 The site-adjusted summary shows whether the preregistered conclusions persist after allowing outcomes to cluster within labs.
 
+
+\newpage
+
+## H1 analyses with alternative denominator
+
+The primary H1 analyses above follow the preregistered analytical plan: the denominator includes trials answered correctly in either phase. The hypothesis wording instead could refer to trials answered correctly in the deliberative phase. These additional analyses use that second denominator, retaining the H1 exclusions for external-resource use, familiarity, and the dot task, as well as excluding missing intuitive responses. The outcome is an initially incorrect response that becomes correct, among trials correct in the deliberative phase: Incorrect → Correct / (Correct → Correct + Incorrect → Correct). Thus, Correct → Incorrect trials contribute to the primary denominator but not to this alternative denominator. 
+
+### Observed proportions under both denominators
+
+These tables report pooled trial counts and percentages for the overall sample and each cultural group. They use the same exclusions under both definitions; percentages are calculated from the counts within each condition, rather than averaging participant percentages. The control rows describe the outcome tested by H1a and H1b.
+
+```{r h1-alternative-data, include=FALSE}
+dat_H1_alt <- d_all_H1 %>%
+  filter(accuracy_reflective == 1, !is.na(accuracy_intuitive)) %>%
+  mutate(
+    correct_phase2 = as.integer(accuracy_intuitive == 0),
+    feedback = as.integer(feedback == "F"),
+    justification = as.integer(justification == "J")
+  ) %>%
+  select(correct_phase2, participant, problem, feedback, justification,
+         Country, culture, LabID)
+
+h1_alt_scopes <- c("Overall", "Individualistic", "Collectivistic")
+h1_alt_subset <- function(data, scope) {
+  if (scope == "Overall") data else filter(data, culture == scope)
+}
+h1_alt_condition <- function(feedback, justification) {
+  case_when(
+    feedback == 0 & justification == 0 ~ "Control",
+    feedback == 1 & justification == 0 ~ "Feedback only",
+    feedback == 0 & justification == 1 ~ "Justification only",
+    feedback == 1 & justification == 1 ~ "Feedback and justification"
+  )
+}
+h1_denominator_counts <- bind_rows(lapply(h1_alt_scopes, function(scope) {
+  primary <- h1_alt_subset(dat_H1, scope) %>%
+    group_by(feedback, justification) %>%
+    summarise(primary_n = n(), primary_corrected = sum(correct_phase2),
+              .groups = "drop")
+  alternative <- h1_alt_subset(dat_H1_alt, scope) %>%
+    group_by(feedback, justification) %>%
+    summarise(alternative_n = n(), alternative_corrected = sum(correct_phase2),
+              .groups = "drop")
+  left_join(primary, alternative, by = c("feedback", "justification")) %>%
+    arrange(justification, feedback) %>%
+    mutate(Sample = scope, Condition = h1_alt_condition(feedback, justification))
+}))
+stopifnot(all(h1_denominator_counts$primary_corrected ==
+                h1_denominator_counts$alternative_corrected),
+          all(h1_denominator_counts$alternative_n <= h1_denominator_counts$primary_n))
+```
+
+```{r h1-alternative-descriptives, results='asis'}
+for (scope in h1_alt_scopes) {
+  h1_denominator_counts %>%
+    filter(Sample == scope) %>%
+    transmute(
+      Condition,
+      `Corrections` = primary_corrected,
+      `Either-phase N` = primary_n,
+      `Either-phase %` = sprintf("%.1f%%", 100 * primary_corrected / primary_n),
+      `Deliberative-phase N` = alternative_n,
+      `Deliberative-phase %` = sprintf("%.1f%%", 100 * alternative_corrected / alternative_n)
+    ) %>%
+    knitr::kable(booktabs = TRUE, align = c("l", "r", "r", "r", "r", "r"),
+                 caption = paste("Observed H1 correction percentages under both denominators:", scope)) %>%
+    print()
+  cat("\n\n")
+}
+```
+
+### Model specifications and inference
+
+All models retain the feedback × justification fixed effects and uncorrelated country-level random intercepts and manipulation slopes from the primary analyses. Separate models are fitted to the overall sample, individualistic countries, and collectivistic countries. The two robustness checks add a CRT-problem random intercept or a participating-site (LabID) random intercept, separately. Each model uses complete cases for its variables; the site-adjusted fits additionally require a nonmissing LabID.
+
+H1a tests whether the control-condition probability is below .50 overall; H1b requires this result in both cultural groups. Each test uses the intercept's Wald z statistic and a left-tailed p-value at α = .05. Model-estimated proportions and 95% CIs are computed from the fixed effects with random effects set to zero, using Wald intervals on the logit scale transformed back to probabilities. 
+
+```{r h1-alternative-models, include=FALSE}
+h1_alt_fit <- function(alt_data, specification) {
+  # Keep each formula explicit: v2_fit hashes both this call and alt_data.
+  switch(specification,
+    country = v2_fit(glmer(
+      correct_phase2 ~ feedback * justification + (feedback * justification || Country),
+      family = binomial("logit"), data = alt_data,
+      control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5)))),
+    problem = v2_fit(glmer(
+      correct_phase2 ~ feedback * justification + (feedback * justification || Country) + (1 | problem),
+      family = binomial("logit"), data = alt_data,
+      control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5)))),
+    site = v2_fit(glmer(
+      correct_phase2 ~ feedback * justification + (feedback * justification || Country) + (1 | LabID),
+      family = binomial("logit"), data = alt_data,
+      control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 1e5))))
+  )
+}
+h1_alt_specifications <- c(
+  country = "Country random effects",
+  problem = "Robustness check: additional CRT-problem random intercept",
+  site = "Robustness check: additional participating-site random intercept"
+)
+h1_alt_models <- setNames(lapply(names(h1_alt_specifications), function(specification) {
+  setNames(lapply(h1_alt_scopes, function(scope) {
+    h1_alt_fit(h1_alt_subset(dat_H1_alt, scope), specification)
+  }), h1_alt_scopes)
+}), names(h1_alt_specifications))
+
+h1_alt_control_results <- bind_rows(lapply(names(h1_alt_models), function(specification) {
+  bind_rows(lapply(h1_alt_scopes, function(scope) {
+    model <- h1_alt_models[[specification]][[scope]]
+    z <- unname(fixef(model)["(Intercept)"] / sqrt(vcov(model)["(Intercept)", "(Intercept)"]))
+    control <- model_condition_probabilities(model) %>% filter(Condition == "Control")
+    convergence <- model@optinfo$conv$lme4$messages
+    tibble(
+      specification, Sample = scope, N = nobs(model),
+      estimate = control$estimate, lower = control$lower, upper = control$upper,
+      z, p = pnorm(z), singular = lme4::isSingular(model),
+      convergence = if (is.null(convergence)) "None" else paste(convergence, collapse = "; ")
+    )
+  }))
+}))
+saveRDS(list(observed = h1_denominator_counts, control = h1_alt_control_results),
+        file.path(v2_dir, "derived", "h1-alternative-denominator-summaries.rds"))
+```
+
+```{r h1-alternative-model-tables, results='asis'}
+for (specification in names(h1_alt_specifications)) {
+  cat("\n\n### ", h1_alt_specifications[[specification]], "\n\n", sep = "")
+  for (scope in h1_alt_scopes) {
+    model <- h1_alt_models[[specification]][[scope]]
+    caption_suffix <- paste(scope, "—", h1_alt_specifications[[specification]])
+    cat("\n\n#### ", scope, "\n\n", sep = "")
+    print(model_table_2(model, caption = paste("H1 alternative-denominator coefficients:", caption_suffix)))
+    cat("\n\n")
+    print(model_probability_table(model, caption = paste("H1 alternative-denominator proportions and 95% CIs:", caption_suffix)))
+    cat("\n\n")
+  }
+
+  tests <- h1_alt_control_results %>% filter(.data$specification == .env$specification)
+  cat("\n\n#### H1 hypothesis testing summary\n\n")
+  tests %>%
+    transmute(
+      Sample,
+      `Control proportion` = sprintf("%.2f", estimate),
+      `95% CI` = sprintf("[%.2f, %.2f]", lower, upper),
+      `Wald Z` = format_z(z),
+      `One-tailed p` = format_p(p)
+    ) %>%
+    knitr::kable(booktabs = TRUE, align = c("l", "r", "c", "r", "r"),
+                 caption = paste("Control-condition H1 tests with the alternative denominator:", h1_alt_specifications[[specification]])) %>%
+    print()
+  cat("\n\n")
+  overall <- tests %>% filter(Sample == "Overall")
+  groups <- tests %>% filter(Sample != "Overall")
+  tibble(
+    Hypothesis = c("H1a", "H1b"),
+    Prediction = c("Control probability below .50 overall", "Control probability below .50 in both cultural groups"),
+    Supported = ifelse(c(overall$p < .05, all(groups$p < .05)), "Yes", "No"),
+    `Wald Z` = c(format_z(overall$z), format_culture_z(setNames(groups$z, groups$Sample))),
+    `p-value(s)` = c(format_p(overall$p), format_culture_p(setNames(groups$p, groups$Sample)))
+  ) %>%
+    knitr::kable(booktabs = TRUE, align = c("l", "l", "c", "l", "l"),
+                 caption = paste("H1 alternative-denominator hypothesis summary:", h1_alt_specifications[[specification]])) %>%
+    print()
+  cat("\n\n", sprintf(
+    "The estimated overall control-condition correction percentage is %.1f%% (95%% CI [%.1f%%, %.1f%%]). H1a is %s under this specification; H1b is %s; support requires a significant left-tailed result in both cultural groups.\n\n",
+    100 * overall$estimate, 100 * overall$lower, 100 * overall$upper,
+    ifelse(overall$p < .05, "supported", "not supported"),
+    ifelse(all(groups$p < .05), "supported", "not supported")), sep = "")
+}
+```
+
+### Model diagnostics
+
+The following table identifies boundary (singular) fits and any convergence messages for the additional models. Singularity indicates that at least one random-effect variance is estimated near zero; the specified random-effects structures are retained to match the primary and robustness analyses.
+
+```{r h1-alternative-diagnostics}
+h1_alt_control_results %>%
+  transmute(
+    Model = unname(h1_alt_specifications[specification]), Sample, N,
+    `Singular fit` = ifelse(singular, "Yes", "No"),
+    `Convergence messages` = convergence
+  ) %>%
+  knitr::kable(booktabs = TRUE,
+               caption = "Diagnostics for the nine alternative-denominator H1 models.")
+```
 
 \newpage
 
