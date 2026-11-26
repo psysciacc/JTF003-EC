@@ -1,0 +1,244 @@
+---
+title: "JTF003-EC: Measurement invariance visualizations (visualizemi)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 8, fig.height = 9)
+library(tidyverse)
+library(lavaan)
+# install once with: remotes::install_github("doomlab/visualizemi")
+library(visualizemi)
+```
+
+This document mirrors the multi-group CFAs in `results.qmd` ("Scales reliability and measurement invariance") and
+adds the `visualizemi` tools: `mgcfa()` (stepwise invariance models plus tidy coefficients), `plot_mi()`
+(item-level visualization of intercepts, latent means, and variances/residuals for **two groups at a time**),
+and `partial_mi()` (which single constraints, if freed, improve fit).
+
+## Data
+
+Data preparation and exclusions are reused from `results.qmd` (chunks `load_data`, `apply_exclusions`,
+`data_preparation`, `data_preparation_2`) so the sample is identical to the report.
+
+```{r data}
+prep_labels <- c("load_data", "apply_exclusions", "data_preparation", "data_preparation_2")
+qmd <- readLines("results.qmd", warn = FALSE)
+get_chunk <- function(lab) {
+  st <- grep(paste0("^```\\{r ", lab, "[,}]"), qmd)[1]
+  en <- st + which(qmd[(st + 1):length(qmd)] == "```")[1]
+  qmd[(st + 1):(en - 1)]
+}
+for (lab in prep_labels) {
+  code <- get_chunk(lab)
+  # country recoding only: skip the World Bank GDP / GCI joins (not needed for MI)
+  if (lab == "data_preparation") code <- c(code[seq_len(grep("^wb_iso2_alias", code) - 1)],
+              code[(grep("mutate\\(culture", code) - 1):(grep("^gci <- read.csv", code) - 1)])
+  # long-format reshaping starts at d_crt_long; not needed here
+  if (lab == "data_preparation_2") code <- code[seq_len(grep("^d_crt_long", code)[1] - 1)]
+  eval(parse(text = code), envir = globalenv())
+}
+
+IH_items  <- paste0("IH_", 1:9)
+AOT_items <- paste0("AOT_", 1:13)
+IC_items  <- paste0("IC_", 1:16)
+```
+
+## Models (same specifications as `results.qmd`)
+
+```{r models}
+IH_model <- '
+  IH =~ IH_1 + IH_2 + IH_3 + IH_4 + IH_5 + IH_6 + IH_7 + IH_8 + IH_9
+  POS =~ IH_1 + IH_2 + IH_3 + IH_4 + IH_5 + IH_7
+  NEG =~ IH_6 + IH_8 + IH_9
+  IH ~~ 0*POS
+  IH ~~ 0*NEG
+  POS ~~ NEG
+  POS ~~ 1*POS
+  NEG ~~ 1*NEG'
+IH_method <- c(paste0("POS=~", c("IH_1","IH_2","IH_3","IH_4","IH_5","IH_7")),
+               paste0("NEG=~", c("IH_6","IH_8","IH_9")))
+
+AOT_model <- '
+  AOT =~ AOT_1 + AOT_2 + AOT_3 + AOT_4 + AOT_5 + AOT_6 + AOT_7 +
+         AOT_8 + AOT_9 + AOT_10 + AOT_11 + AOT_12 + AOT_13
+  NEG =~ AOT_2 + AOT_4 + AOT_5 + AOT_6 + AOT_7 + AOT_8 + AOT_10 + AOT_13
+  AOT ~~ 0*NEG
+  NEG ~~ 1*NEG'
+AOT_method <- paste0("NEG=~", paste0("AOT_", c(2,4,5,6,7,8,10,13)))
+
+IC_model <- '
+  HI =~ IC_1 + IC_2 + IC_3 + IC_4
+  VI =~ IC_5 + IC_6 + IC_7 + IC_8
+  HC =~ IC_9 + IC_10 + IC_11 + IC_12
+  VC =~ IC_13 + IC_14 + IC_15 + IC_16'
+```
+
+## Choosing the country pair
+
+`plot_mi()` compares two groups at a time. By default this uses the two countries with the most participants
+that meet each scale's threshold (100 for IH/AOT, 200 for IC). Change `pairs` to compare any other pair.
+
+```{r pairs}
+top_countries <- function(n_min, k = 2) {
+  d %>% count(Country, sort = TRUE) %>% filter(n >= n_min) %>% slice_head(n = k) %>% pull(Country)
+}
+pairs <- list(IH = top_countries(100), AOT = top_countries(100), IC = top_countries(200))
+pairs
+```
+
+## Fit the stepwise multi-group models
+
+`mgcfa()` fits configural, then metric (loadings), then scalar (intercepts). For IH and AOT the wording-factor
+loadings stay free (`group.partial`), as in the report.
+
+```{r mgcfa}
+fit_pair <- function(model, items, countries, partial = NULL) {
+  dat <- d %>% filter(Country %in% countries) %>% select(Country, all_of(items)) %>% as.data.frame()
+  dat$Country <- as.character(dat$Country)
+  mgcfa(model = model, data = dat, group = "Country",
+        group.equal = c("loadings", "intercepts"),
+        group.partial = partial,
+        estimator = "MLR", std.lv = TRUE, meanstructure = TRUE,
+        conf.level = .95)
+}
+mg_IH  <- fit_pair(IH_model,  IH_items,  pairs$IH,  IH_method)
+mg_AOT <- fit_pair(AOT_model, AOT_items, pairs$AOT, AOT_method)
+mg_IC  <- fit_pair(IC_model,  IC_items,  pairs$IC)
+
+# step labels accepted by plot_mi(model_step = )
+unique(mg_IC$model_coef$model)
+```
+
+```{r fit-tables}
+knitr::kable(mg_IH$model_fit,  digits = 3, caption = "IH: model fit by step")
+knitr::kable(mg_AOT$model_fit, digits = 3, caption = "AOT: model fit by step")
+knitr::kable(mg_IC$model_fit,  digits = 3, caption = "IC: model fit by step")
+```
+
+## `plot_mi()` visualizations (IC scale)
+
+Each figure shows the item's intercept line (item regressed on the latent variable, with CI ribbon), the latent
+mean distributions, and the variance/residual distributions for the two countries. Where lines or
+distributions diverge, that parameter differs between countries.
+
+`plot_mi()` takes the first/last `=~` loading for an item, so it assumes each item loads on **one** factor.
+That holds for the IC four-factor model but **not** for the IH and AOT bifactor models (every item also loads on a
+wording factor), so IH and AOT are not plotted here.
+
+**How to read these figures.** The sloped lines and intercept points use the left axis (observed item
+scale). The small violin is an inset, **not** item scores: it draws the sampling distribution of each group's
+residual variance (mean = estimate, SD = its standard error) on its own stretched y-scale, so its height
+does not correspond to the left axis. Use it only to see which group has the larger residual variance; the
+exact values are in the table below.
+
+```{r resid-table}
+resid_tab <- function(mg, items, step = "Configural") {
+  mg$model_coef %>%
+    filter(model == step, op == "~~", term %in% paste(items, "~~", items)) %>%
+    mutate(Country = pairs$IC[group], Item = sub(" ~~.*", "", term)) %>%
+    select(Item, Country, `Residual variance` = estimate, SE = std.error) %>%
+    pivot_wider(names_from = Country, values_from = c(`Residual variance`, SE))
+}
+knitr::kable(resid_tab(mg_IC, IC_items), digits = 3,
+             caption = "IC items: configural residual variances (and SEs) per country, the values drawn in the plot_mi() violins.")
+```
+
+```{r plot-ic-configural, fig.height=9}
+plot_ic <- function(item, lv, step, fit) {
+  plot_mi(data_coef = mg_IC$model_coef, model_step = step, item_name = item,
+          x_limits = c(-3, 3), y_limits = range(d[[item]], na.rm = TRUE),
+          conf.level = .95, model_results = fit, lv_name = lv)$complete
+}
+plot_ic("IC_1", "HI", "Configural", mg_IC$model_configural)
+```
+
+```{r plot-ic-scalar, fig.height=9}
+plot_ic("IC_1", "HI", "intercepts", mg_IC$invariance_models$model.intercepts)
+```
+
+```{r plot-ic-others, fig.height=9}
+# one item per subscale, scalar model
+plot_ic("IC_5",  "VI", "intercepts", mg_IC$invariance_models$model.intercepts)
+plot_ic("IC_9",  "HC", "intercepts", mg_IC$invariance_models$model.intercepts)
+plot_ic("IC_13", "VC", "intercepts", mg_IC$invariance_models$model.intercepts)
+```
+
+## `partial_mi()`: which loadings/intercepts drive non-invariance?
+
+```{r partial-ic}
+dat_IC <- d %>% filter(Country %in% pairs$IC) %>% select(Country, all_of(IC_items)) %>% as.data.frame()
+dat_IC$Country <- as.character(dat_IC$Country)
+pmi_IC <- partial_mi(saved_model = mg_IC$invariance_models$model.loadings,
+                     data = dat_IC, model = IC_model, group = "Country",
+                     group.equal = "loadings", partial_step = "loadings",
+                     estimator = "MLR", std.lv = TRUE)
+knitr::kable(pmi_IC$fit_table, digits = 3)
+```
+
+## Effect sizes
+
+These use `nboot = 100` (fast, exploratory); raise it (e.g., 1000) for final results. Invariance is judged
+with ΔCFI ≤ .01. Bootstrapped rates are compared with random group assignment, and h is the effect size of
+that difference in proportions.
+
+### Observed item means: `calculate_d()` (IC, US vs Turkey)
+
+```{r calc-d}
+g1 <- pairs$IC[1]; g2 <- pairs$IC[2]
+d_tab <- map_dfr(IC_items, function(it) {
+  x1 <- d[[it]][d$Country == g1]; x2 <- d[[it]][d$Country == g2]
+  x1 <- x1[!is.na(x1)]; x2 <- x2[!is.na(x2)]
+  r <- calculate_d(m1 = mean(x1), m2 = mean(x2), sd1 = sd(x1), sd2 = sd(x2),
+                   n1 = length(x1), n2 = length(x2), a = .05)
+  tibble(Item = it, M1 = mean(x1), M2 = mean(x2), d = r$d, d_low = r$dlow, d_high = r$dhigh)
+})
+names(d_tab)[2:3] <- paste0("M_", c(g1, g2))
+knitr::kable(d_tab, digits = 2, caption = paste0("Cohen's d (", g1, " minus ", g2, ") with 95% CI for each IC item."))
+```
+
+### `bootstrap_model()`: how often does each step count as invariant?
+
+```{r boot-model, cache=TRUE}
+set.seed(20261125)
+t0 <- Sys.time()
+boot_IC <- bootstrap_model(saved_configural = mg_IC$model_configural,
+                           data = dat_IC, model = IC_model, group = "Country",
+                           nboot = 100, invariance_index = "cfi", invariance_rule = .01,
+                           group.equal = c("loadings", "intercepts"),
+                           estimator = "MLR", std.lv = TRUE)
+Sys.time() - t0
+boot_IC
+```
+
+### `bootstrap_partial()`: which parameters differ? (IC)
+
+```{r boot-partial-loadings, cache=TRUE, fig.height=8}
+set.seed(20261125)
+bp_load <- bootstrap_partial(saved_model = mg_IC$invariance_models$model.loadings,
+                             data = dat_IC, model = IC_model, group = "Country",
+                             nboot = 100, invariance_index = "cfi", invariance_rule = .01,
+                             invariance_compare = fitmeasures(mg_IC$model_configural, "cfi"),
+                             partial_step = "loadings", group.equal = "loadings",
+                             estimator = "MLR", std.lv = TRUE)
+knitr::kable(bp_load$boot_summary, digits = 3, caption = "Loadings: bootstrap summary")
+bp_load$effect_invariance_plot
+```
+
+```{r boot-partial-intercepts, cache=TRUE, fig.height=8}
+set.seed(20261125)
+bp_int <- bootstrap_partial(saved_model = mg_IC$invariance_models$model.intercepts,
+                            data = dat_IC, model = IC_model, group = "Country",
+                            nboot = 100, invariance_index = "cfi", invariance_rule = .01,
+                            invariance_compare = fitmeasures(mg_IC$invariance_models$model.loadings, "cfi"),
+                            partial_step = "intercepts", group.equal = c("loadings", "intercepts"),
+                            estimator = "MLR", std.lv = TRUE)
+knitr::kable(bp_int$boot_summary, digits = 3, caption = "Intercepts: bootstrap summary")
+bp_int$effect_invariance_plot
+```
